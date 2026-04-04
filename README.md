@@ -12,7 +12,7 @@ Internal project rules are maintained in Japanese. The public README remains Eng
 
 ## System Requirements
 
-- macOS 15.5+
+- macOS 15+
 - Xcode 16+
 
 ## Build
@@ -29,7 +29,8 @@ Or open the project in Xcode and build with ⌘B.
 - Drag & drop `.md` files onto the window or Dock icon
 - Set as default app for `.md` files in Finder (Get Info > Open With)
 - Auto-reloads when the file is saved externally
-- Follows system light/dark mode
+- Find in document with ⌘F
+- Adjust theme and text scale from Settings
 
 ## Features
 
@@ -38,6 +39,8 @@ Or open the project in Xcode and build with ⌘B.
 - Relative path resolution for images and links
 - Scroll position preservation on reload
 - One window per file with duplicate detection
+- Theme override: System / Light / Dark
+- Adjustable reading scale
 
 ## Tech Stack
 

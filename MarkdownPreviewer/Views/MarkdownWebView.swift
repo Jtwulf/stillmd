@@ -5,6 +5,11 @@ struct MarkdownWebView: NSViewRepresentable {
     let markdownContent: String
     let baseURL: URL
     @Binding var scrollPosition: CGFloat
+    let themePreference: ThemePreference
+    let textScale: Double
+    let findQuery: String
+    let findRequest: FindRequest?
+    @Binding var findStatus: FindStatus
 
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
@@ -12,6 +17,7 @@ struct MarkdownWebView: NSViewRepresentable {
         let userController = WKUserContentController()
         userController.add(context.coordinator, name: "scrollPosition")
         userController.add(context.coordinator, name: "linkClicked")
+        userController.add(context.coordinator, name: "findResults")
         config.userContentController = userController
 
         let webView = WKWebView(frame: .zero, configuration: config)
@@ -22,38 +28,96 @@ struct MarkdownWebView: NSViewRepresentable {
             markdownContent: markdownContent,
             markedJS: ResourceLoader.loadMarkedJS(),
             highlightJS: ResourceLoader.loadHighlightJS(),
-            css: ResourceLoader.loadCSS()
+            css: ResourceLoader.loadCSS(),
+            initialScrollPosition: Double(scrollPosition),
+            themePreference: themePreference.rawValue,
+            textScale: textScale
         )
         webView.loadHTMLString(html, baseURL: baseURL)
 
         context.coordinator.lastContent = markdownContent
+        context.coordinator.lastThemePreference = themePreference.rawValue
+        context.coordinator.lastTextScale = textScale
+        context.coordinator.lastFindQuery = findQuery
 
         return webView
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
+        context.coordinator.parent = self
+
         guard markdownContent != context.coordinator.lastContent else {
+            applyAppearanceAndFindState(to: webView, context: context)
             return
         }
         context.coordinator.lastContent = markdownContent
 
-        let escaped = markdownContent
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "`", with: "\\`")
-            .replacingOccurrences(of: "$", with: "\\$")
-            .replacingOccurrences(of: "</script>", with: "<\\/script>")
-
-        let js = "updateContent(`\(escaped)`);"
-        webView.evaluateJavaScript(js)
+        evaluateJavaScript(
+            "updateContent(\(Self.javaScriptStringLiteral(markdownContent)), \(Double(scrollPosition)));",
+            in: webView
+        )
+        applyAppearanceAndFindState(to: webView, context: context)
     }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
 
+    private func applyAppearanceAndFindState(to webView: WKWebView, context: Context) {
+        if context.coordinator.lastThemePreference != themePreference.rawValue {
+            context.coordinator.lastThemePreference = themePreference.rawValue
+            evaluateJavaScript(
+                "setThemePreference(\(Self.javaScriptStringLiteral(themePreference.rawValue)));",
+                in: webView
+            )
+        }
+
+        let clampedTextScale = AppPreferences.clampedTextScale(textScale)
+        if context.coordinator.lastTextScale != clampedTextScale {
+            context.coordinator.lastTextScale = clampedTextScale
+            evaluateJavaScript("setTextScale(\(clampedTextScale));", in: webView)
+        }
+
+        if context.coordinator.lastFindQuery != findQuery {
+            context.coordinator.lastFindQuery = findQuery
+            evaluateJavaScript(
+                "updateFindQuery(\(Self.javaScriptStringLiteral(findQuery)));",
+                in: webView
+            )
+        }
+
+        if let findRequest, context.coordinator.lastFindRequestID != findRequest.id {
+            context.coordinator.lastFindRequestID = findRequest.id
+            evaluateJavaScript(
+                "navigateFind(\(Self.javaScriptStringLiteral(findRequest.direction.rawValue)));",
+                in: webView
+            )
+        }
+    }
+
+    private func evaluateJavaScript(_ script: String, in webView: WKWebView) {
+        webView.evaluateJavaScript(script)
+    }
+
+    private static func javaScriptStringLiteral(_ value: String) -> String {
+        let data = try? JSONSerialization.data(withJSONObject: [value], options: [])
+        guard
+            let data,
+            let encoded = String(data: data, encoding: .utf8)
+        else {
+            return "\"\""
+        }
+
+        return String(encoded.dropFirst().dropLast())
+    }
+
     class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
-        let parent: MarkdownWebView
+        var parent: MarkdownWebView
         var lastContent: String = ""
+        var lastThemePreference: String = ThemePreference.system.rawValue
+        var lastTextScale: Double = AppPreferences.defaultTextScale
+        var lastFindQuery: String = ""
+        var lastFindRequestID: Int?
 
         init(_ parent: MarkdownWebView) {
             self.parent = parent
@@ -124,6 +188,17 @@ struct MarkdownWebView: NSViewRepresentable {
             case "scrollPosition":
                 if let position = message.body as? Double {
                     parent.scrollPosition = CGFloat(position)
+                }
+            case "findResults":
+                if
+                    let result = message.body as? [String: Any],
+                    let matchCount = result["matchCount"] as? Int,
+                    let currentIndex = result["currentIndex"] as? Int
+                {
+                    parent.findStatus = FindStatus(
+                        matchCount: matchCount,
+                        currentIndex: currentIndex
+                    )
                 }
             case "linkClicked":
                 if let urlString = message.body as? String,

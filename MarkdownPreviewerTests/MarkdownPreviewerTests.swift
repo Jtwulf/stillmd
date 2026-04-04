@@ -230,6 +230,12 @@ struct HTMLTemplateUnitTests {
         #expect(html.contains("window.webkit.messageHandlers.scrollPosition"))
     }
 
+    @Test("Contains findResults message handler")
+    func containsFindResultsHandler() {
+        let html = buildHTML(from: "test")
+        #expect(html.contains("window.webkit.messageHandlers.findResults"))
+    }
+
     // --- updateContent Function ---
 
     @Test("Contains updateContent function")
@@ -313,9 +319,26 @@ struct HTMLTemplateUnitTests {
     @Test("updateContent preserves scroll position")
     func updateContentPreservesScroll() {
         let html = buildHTML(from: "test")
-        // updateContent should save scrollY and restore after re-render
-        #expect(html.contains("window.scrollTo"))
-        #expect(html.contains("Math.min(scrollY"))
+        // updateContent should restore the saved position through the shared helper.
+        #expect(html.contains("function restoreScrollPosition"))
+        #expect(html.contains("updateContent(md, targetScrollY)"))
+        #expect(html.contains("restoreScrollPosition(targetScrollY)"))
+    }
+
+    @Test("Contains theme and text scale functions")
+    func containsThemeAndTextScaleFunctions() {
+        let html = buildHTML(from: "test")
+        #expect(html.contains("function setThemePreference"))
+        #expect(html.contains("function setTextScale"))
+        #expect(html.contains("data-theme-preference"))
+    }
+
+    @Test("Contains find query update functions")
+    func containsFindQueryFunctions() {
+        let html = buildHTML(from: "test")
+        #expect(html.contains("function updateFindQuery"))
+        #expect(html.contains("function navigateFind"))
+        #expect(html.contains("mark.className = 'stillmd-find-match'"))
     }
 }
 
@@ -933,6 +956,28 @@ struct PreviewViewModelUnitTests {
                 "markdownContent should match updated file content")
         #expect(vm.errorMessage == nil,
                 "errorMessage should be nil after successful reload")
+    }
+}
+
+@Suite("AppPreferences Unit Tests")
+struct AppPreferencesUnitTests {
+
+    @Test("ThemePreference system uses nil color scheme")
+    func themePreferenceSystemUsesNilColorScheme() {
+        #expect(ThemePreference.system.colorScheme == nil)
+    }
+
+    @Test("ThemePreference light and dark map to matching schemes")
+    func themePreferencesMapToColorSchemes() {
+        #expect(ThemePreference.light.colorScheme == .light)
+        #expect(ThemePreference.dark.colorScheme == .dark)
+    }
+
+    @Test("Text scale is clamped to supported range")
+    func textScaleIsClampedToSupportedRange() {
+        #expect(AppPreferences.clampedTextScale(0.1) == AppPreferences.textScaleRange.lowerBound)
+        #expect(AppPreferences.clampedTextScale(2.0) == AppPreferences.textScaleRange.upperBound)
+        #expect(AppPreferences.clampedTextScale(1.1) == 1.1)
     }
 }
 
