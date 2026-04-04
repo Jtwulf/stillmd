@@ -2,8 +2,6 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// Root view that handles both the empty state (no file) and the preview state.
-/// When launched without a file, shows a drop target / open prompt.
-/// When a file URL is provided, shows the preview.
 struct RootView: View {
     @Binding var fileURL: URL?
     @ObservedObject var windowManager: WindowManager
@@ -21,6 +19,19 @@ struct RootView: View {
         }
         .onAppear {
             windowManager.openWindowAction = openWindow
+            AppDelegate.openWindowAction = openWindow
+
+            // Process any URLs that arrived before the scene was ready
+            // (e.g., Finder "Open With" on cold start)
+            if fileURL == nil, let firstURL = AppDelegate.pendingURLs.first {
+                // Open the first pending URL in this window
+                fileURL = firstURL
+                // Open remaining URLs in new windows
+                for url in AppDelegate.pendingURLs.dropFirst() {
+                    openWindow(value: url)
+                }
+                AppDelegate.pendingURLs.removeAll()
+            }
         }
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
             handleDrop(providers)
@@ -47,10 +58,8 @@ struct RootView: View {
                 guard let url, FileValidation.isMarkdownFile(url) else { return }
                 Task { @MainActor in
                     if self.fileURL == nil {
-                        // No file in this window yet — open here
                         self.fileURL = url
                     } else {
-                        // Already showing a file — open in new window
                         self.windowManager.openFile(url)
                     }
                 }
