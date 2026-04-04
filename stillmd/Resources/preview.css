@@ -73,10 +73,11 @@ body {
     user-select: none;
 }
 
+/* top/left are set in JS from #content geometry (centered body + dynamic gutter). */
 #document-line-number-column {
     position: absolute;
-    top: 44px;
-    left: 28px;
+    top: 0;
+    left: 0;
     width: var(--document-line-number-gutter-width);
 }
 
