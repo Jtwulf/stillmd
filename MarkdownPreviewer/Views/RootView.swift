@@ -6,42 +6,29 @@ struct RootView: View {
     @ObservedObject var pendingFileOpenCoordinator: PendingFileOpenCoordinator
     @Environment(\.openWindow) private var openWindow
 
-    @State private var isReady = false
+    @State private var isEmptyStatePresented = false
     @State private var isDropTargeted = false
 
     var body: some View {
-        Group {
-            if let url = fileURL {
-                PreviewView(fileURL: url, windowManager: windowManager)
-            } else {
-                EmptyStateView(
-                    onOpen: {
-                        openFileInCurrentWindow()
-                    },
-                    isDropTargeted: isDropTargeted
-                )
-            }
-        }
-        .opacity(isReady ? 1 : 0)
-        .animation(.easeOut(duration: 0.16), value: isReady)
+        rootContent
         .onAppear {
             windowManager.openWindowAction = openWindow
 
             if fileURL != nil {
-                isReady = true
+                isEmptyStatePresented = false
                 return
             }
 
             if consumePendingURLs() {
-                isReady = true
+                isEmptyStatePresented = false
                 return
             }
 
             revealEmptyStateIfNeeded()
         }
         .onChange(of: pendingFileOpenCoordinator.pendingChangeID) { _, _ in
-            if consumePendingURLs(), !isReady {
-                isReady = true
+            if consumePendingURLs() {
+                isEmptyStatePresented = false
             }
         }
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
@@ -50,19 +37,32 @@ struct RootView: View {
         .navigationTitle(fileURL?.lastPathComponent ?? "stillmd")
     }
 
+    @ViewBuilder
+    private var rootContent: some View {
+        if let url = fileURL {
+            PreviewView(fileURL: url, windowManager: windowManager)
+        } else {
+            EmptyStateView(
+                onOpen: {
+                    openFileInCurrentWindow()
+                },
+                isDropTargeted: isDropTargeted,
+                isPresented: isEmptyStatePresented
+            )
+        }
+    }
+
     private func revealEmptyStateIfNeeded() {
         Task { @MainActor in
             await Task.yield()
 
             if consumePendingURLs() {
-                isReady = true
+                isEmptyStatePresented = false
                 return
             }
 
-            if !isReady {
-                withAnimation(.easeOut(duration: 0.16)) {
-                    isReady = true
-                }
+            if !isEmptyStatePresented {
+                isEmptyStatePresented = true
             }
         }
     }
@@ -90,9 +90,7 @@ struct RootView: View {
         FileValidation.configureOpenPanel(panel, allowsMultipleSelection: false)
         if panel.runModal() == .OK, let url = panel.url {
             fileURL = url
-            if !isReady {
-                isReady = true
-            }
+            isEmptyStatePresented = false
         }
     }
 
