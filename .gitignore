@@ -1,0 +1,20 @@
+# Xcode
+DerivedData/
+build/
+*.xcworkspace
+xcuserdata/
+
+# macOS
+.DS_Store
+*.swp
+*~
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+Package.resolved
+
+# Xcode project (using SPM as primary build system)
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
