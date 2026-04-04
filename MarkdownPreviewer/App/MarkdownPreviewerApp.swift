@@ -13,6 +13,12 @@ struct MarkdownPreviewerApp: App {
 
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var windowManager = WindowManager()
+    @AppStorage(AppPreferences.themeKey) private var themePreferenceRawValue =
+        ThemePreference.system.rawValue
+
+    private var themePreference: ThemePreference {
+        ThemePreference(rawValue: themePreferenceRawValue) ?? .system
+    }
 
     var body: some Scene {
         WindowGroup(for: URL.self) { $url in
@@ -29,6 +35,7 @@ struct MarkdownPreviewerApp: App {
                 )
         }
         .commands {
+            FindCommands()
             CommandGroup(replacing: .newItem) {
                 Button("Open…") {
                     windowManager.showOpenPanel()
