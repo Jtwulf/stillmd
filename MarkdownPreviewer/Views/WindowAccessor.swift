@@ -177,6 +177,8 @@ struct WindowAccessor: NSViewRepresentable {
         private var widthConstraint: NSLayoutConstraint?
 
         func teardown() {
+            // Invalidate any in-flight delayed reapply work from `updateWindow`.
+            configurationSequence += 1
             removeWindowLifecycleObservers()
             if let accessory = documentTitleAccessory, let window = accessoryWindow,
                 let index = window.titlebarAccessoryViewControllers.firstIndex(where: { $0 === accessory })
