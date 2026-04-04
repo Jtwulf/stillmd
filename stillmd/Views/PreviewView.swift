@@ -113,7 +113,7 @@ struct PreviewView: View {
             }
         }
         .opacity(previewRevealOpacity)
-        .offset(y: -10 + previewRevealOffset)
+        .offset(y: previewRevealOffset)
         .animation(
             StillmdMotion.animation(for: StillmdMotion.previewReveal, reduceMotion: reduceMotion),
             value: isPreviewRevealed
