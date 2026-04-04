@@ -233,16 +233,19 @@ struct WindowAccessor: NSViewRepresentable {
         }
 
         func syncDocumentTitleAccessory(on window: NSWindow, title: String, colorScheme: ColorScheme) {
-            if accessoryWindow != nil, accessoryWindow !== window {
-                if let accessory = documentTitleAccessory, let previous = accessoryWindow,
-                    let index = previous.titlebarAccessoryViewControllers.firstIndex(where: { $0 === accessory })
-                {
-                    previous.removeTitlebarAccessoryViewController(at: index)
+            if let accessory = documentTitleAccessory {
+                let attachedToCurrent = window.titlebarAccessoryViewControllers.contains(where: { $0 === accessory })
+                if !attachedToCurrent {
+                    if let previous = accessoryWindow,
+                        let index = previous.titlebarAccessoryViewControllers.firstIndex(where: { $0 === accessory })
+                    {
+                        previous.removeTitlebarAccessoryViewController(at: index)
+                    }
+                    documentTitleAccessory = nil
+                    accessoryWindow = nil
+                    widthConstraint?.isActive = false
+                    widthConstraint = nil
                 }
-                documentTitleAccessory = nil
-                accessoryWindow = nil
-                widthConstraint?.isActive = false
-                widthConstraint = nil
             }
 
             if let accessory = documentTitleAccessory {
