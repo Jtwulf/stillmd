@@ -17,6 +17,8 @@ struct PreviewView: View {
     @State private var isFindBarChromeReserved = false
     @State private var isDocumentLineNumbersPresented = false
     @State private var pendingFindResetTask: Task<Void, Never>?
+    @State private var isPreviewRevealed = false
+    @State private var previewRevealScheduleID = 0
 
     init(fileURL: URL, windowManager: WindowManager) {
         self.fileURL = fileURL
@@ -37,6 +39,14 @@ struct PreviewView: View {
         isFindBarChromeReserved || (viewModel.errorMessage != nil && shouldKeepPreviewVisible)
     }
 
+    private var previewRevealOpacity: Double {
+        reduceMotion ? 1 : (isPreviewRevealed ? 1 : 0)
+    }
+
+    private var previewRevealOffset: CGFloat {
+        reduceMotion || isPreviewRevealed ? 0 : StillmdMotion.previewReveal.offsetY
+    }
+
     var body: some View {
         corePreview
             .safeAreaInset(edge: .top, spacing: 0) {
@@ -48,6 +58,7 @@ struct PreviewView: View {
             // regardless of how the window was created (Finder, Dock, NSWorkspace, etc.)
             windowManager.registerFile(fileURL)
             viewModel.startWatching()
+            schedulePreviewReveal()
         }
         .onDisappear {
             pendingFindResetTask?.cancel()
@@ -84,20 +95,43 @@ struct PreviewView: View {
 
     @ViewBuilder
     private var corePreview: some View {
-        if shouldKeepPreviewVisible {
-            MarkdownWebView(
-                markdownContent: viewModel.markdownContent,
-                baseURL: fileURL.deletingLastPathComponent(),
-                scrollPosition: $viewModel.scrollPosition,
-                themePreference: themePreference,
-                textScale: AppPreferences.clampedTextScale(textScale),
-                documentLineNumbersVisible: isDocumentLineNumbersPresented,
-                findQuery: findQuery,
-                findRequest: findRequest,
-                findStatus: $findStatus
-            )
-        } else if let error = viewModel.errorMessage {
-            ErrorView(message: error)
+        Group {
+            if shouldKeepPreviewVisible {
+                MarkdownWebView(
+                    markdownContent: viewModel.markdownContent,
+                    baseURL: fileURL.deletingLastPathComponent(),
+                    scrollPosition: $viewModel.scrollPosition,
+                    themePreference: themePreference,
+                    textScale: AppPreferences.clampedTextScale(textScale),
+                    documentLineNumbersVisible: isDocumentLineNumbersPresented,
+                    findQuery: findQuery,
+                    findRequest: findRequest,
+                    findStatus: $findStatus
+                )
+            } else if let error = viewModel.errorMessage {
+                ErrorView(message: error)
+            }
+        }
+        .opacity(previewRevealOpacity)
+        .offset(y: -10 + previewRevealOffset)
+        .animation(
+            StillmdMotion.animation(for: StillmdMotion.previewReveal, reduceMotion: reduceMotion),
+            value: isPreviewRevealed
+        )
+    }
+
+    private func schedulePreviewReveal() {
+        previewRevealScheduleID += 1
+        let scheduleID = previewRevealScheduleID
+        if reduceMotion {
+            isPreviewRevealed = true
+            return
+        }
+        isPreviewRevealed = false
+        Task { @MainActor in
+            await Task.yield()
+            guard previewRevealScheduleID == scheduleID else { return }
+            isPreviewRevealed = true
         }
     }
 
