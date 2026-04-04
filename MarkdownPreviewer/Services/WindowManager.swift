@@ -1,16 +1,30 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+private final class WeakWindowReference {
+    weak var window: NSWindow?
+
+    init(window: NSWindow) {
+        self.window = window
+    }
+}
+
 @MainActor
 class WindowManager: ObservableObject {
     /// Currently open file URLs (for duplicate detection).
     @Published private(set) var openFiles: Set<URL> = []
+    private var windowsByURL: [URL: WeakWindowReference] = [:]
 
     /// Stored reference to the active scene's `openWindow` action.
     var openWindowAction: OpenWindowAction?
 
     /// Test-only hook: called instead of `openWindowAction` when set.
     var _testOpenWindowHandler: ((URL) -> Void)?
+    var _testBringToFrontHandler: ((URL) -> Void)?
+    var _registeredWindowCount: Int {
+        pruneWindowReferences()
+        return windowsByURL.count
+    }
 
     func openFile(_ url: URL) {
         let resolved = url.standardizedFileURL
@@ -39,8 +53,15 @@ class WindowManager: ObservableObject {
         openFiles.insert(url.standardizedFileURL)
     }
 
+    func registerWindow(_ window: NSWindow, for url: URL) {
+        pruneWindowReferences()
+        windowsByURL[url.standardizedFileURL] = WeakWindowReference(window: window)
+    }
+
     func closeFile(_ url: URL) {
-        openFiles.remove(url.standardizedFileURL)
+        let resolved = url.standardizedFileURL
+        openFiles.remove(resolved)
+        windowsByURL.removeValue(forKey: resolved)
     }
 
     func showOpenPanel() {
@@ -54,11 +75,27 @@ class WindowManager: ObservableObject {
     }
 
     private func bringToFront(_ url: URL) {
-        for window in NSApp.windows {
-            if window.representedURL == url {
-                window.makeKeyAndOrderFront(nil)
-                return
-            }
+        if let testHandler = _testBringToFrontHandler {
+            testHandler(url)
+            return
         }
+
+        pruneWindowReferences()
+
+        if let window = windowsByURL[url]?.window {
+            NSApp.activate(ignoringOtherApps: true)
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        for window in NSApp.windows where window.representedURL == url {
+            NSApp.activate(ignoringOtherApps: true)
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+    }
+
+    private func pruneWindowReferences() {
+        windowsByURL = windowsByURL.filter { $0.value.window != nil }
     }
 }

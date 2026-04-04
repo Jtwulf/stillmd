@@ -25,7 +25,7 @@ struct EmptyStateView: View {
         .frame(maxWidth: 280)
         .padding(.horizontal, 32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .offset(y: -28)
+        .offset(y: -12)
         .animation(
             reduceMotion ? nil : .easeOut(duration: 0.14),
             value: isDropTargeted
