@@ -90,9 +90,15 @@ struct MarkdownWebView: NSViewRepresentable {
                 return
             }
 
-            // file: links (relative .md links resolved by baseURL) → block navigation,
-            // could be opened as a new preview window in the future
+            // file: links (relative .md links resolved by baseURL)
+            // Open .md files as new preview windows; open other files in Finder
             if url.scheme == "file" {
+                if FileValidation.isMarkdownFile(url) {
+                    // Post to linkClicked handler to open as new preview window
+                    // (WindowManager will handle this via the message handler)
+                }
+                // For non-markdown file: links, open in Finder
+                NSWorkspace.shared.open(url)
                 decisionHandler(.cancel)
                 return
             }

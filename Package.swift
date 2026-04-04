@@ -10,6 +10,7 @@ let package = Package(
         .executableTarget(
             name: "MarkdownPreviewer",
             path: "MarkdownPreviewer",
+            exclude: ["Info.plist"],
             resources: [
                 .copy("Resources/marked.min.js"),
                 .copy("Resources/highlight.min.js"),

@@ -177,3 +177,179 @@ del {
     text-decoration: line-through;
     opacity: 0.7;
 }
+
+/* highlight.js token styles — Light mode */
+.hljs-keyword {
+    color: #cf222e;
+}
+
+.hljs-string {
+    color: #0a3069;
+}
+
+.hljs-number {
+    color: #0550ae;
+}
+
+.hljs-literal {
+    color: #0550ae;
+}
+
+.hljs-built_in {
+    color: #8250df;
+}
+
+.hljs-type {
+    color: #8250df;
+}
+
+.hljs-comment {
+    color: #6e7781;
+    font-style: italic;
+}
+
+.hljs-title {
+    color: #8250df;
+}
+
+.hljs-function {
+    color: #8250df;
+}
+
+.hljs-params {
+    color: var(--code-text);
+}
+
+.hljs-attr {
+    color: #0550ae;
+}
+
+.hljs-attribute {
+    color: #0550ae;
+}
+
+.hljs-selector-tag {
+    color: #116329;
+}
+
+.hljs-selector-class {
+    color: #0550ae;
+}
+
+.hljs-selector-id {
+    color: #0550ae;
+}
+
+.hljs-meta {
+    color: #0550ae;
+}
+
+.hljs-variable {
+    color: #953800;
+}
+
+.hljs-template-variable {
+    color: #953800;
+}
+
+.hljs-regexp {
+    color: #0a3069;
+}
+
+.hljs-addition {
+    color: #116329;
+    background-color: #dafbe1;
+}
+
+.hljs-deletion {
+    color: #82071e;
+    background-color: #ffebe9;
+}
+
+/* highlight.js token styles — Dark mode */
+[data-theme="dark"] .hljs-keyword {
+    color: #ff7b72;
+}
+
+[data-theme="dark"] .hljs-string {
+    color: #a5d6ff;
+}
+
+[data-theme="dark"] .hljs-number {
+    color: #79c0ff;
+}
+
+[data-theme="dark"] .hljs-literal {
+    color: #79c0ff;
+}
+
+[data-theme="dark"] .hljs-built_in {
+    color: #d2a8ff;
+}
+
+[data-theme="dark"] .hljs-type {
+    color: #d2a8ff;
+}
+
+[data-theme="dark"] .hljs-comment {
+    color: #8b949e;
+    font-style: italic;
+}
+
+[data-theme="dark"] .hljs-title {
+    color: #d2a8ff;
+}
+
+[data-theme="dark"] .hljs-function {
+    color: #d2a8ff;
+}
+
+[data-theme="dark"] .hljs-params {
+    color: var(--code-text);
+}
+
+[data-theme="dark"] .hljs-attr {
+    color: #79c0ff;
+}
+
+[data-theme="dark"] .hljs-attribute {
+    color: #79c0ff;
+}
+
+[data-theme="dark"] .hljs-selector-tag {
+    color: #7ee787;
+}
+
+[data-theme="dark"] .hljs-selector-class {
+    color: #79c0ff;
+}
+
+[data-theme="dark"] .hljs-selector-id {
+    color: #79c0ff;
+}
+
+[data-theme="dark"] .hljs-meta {
+    color: #79c0ff;
+}
+
+[data-theme="dark"] .hljs-variable {
+    color: #ffa657;
+}
+
+[data-theme="dark"] .hljs-template-variable {
+    color: #ffa657;
+}
+
+[data-theme="dark"] .hljs-regexp {
+    color: #a5d6ff;
+}
+
+[data-theme="dark"] .hljs-addition {
+    color: #aff5b4;
+    background-color: #033a16;
+}
+
+[data-theme="dark"] .hljs-deletion {
+    color: #ffdcd7;
+    background-color: #67060c;
+}

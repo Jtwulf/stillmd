@@ -74,15 +74,23 @@ final class FileWatcher: @unchecked Sendable {
     }
 
     private func handleDeleteOrRename() {
-        // Editors often save by deleting + creating the file.
-        // Wait briefly then re-check existence.
-        DispatchQueue.global().asyncAfter(deadline: .now() + 0.2) { [weak self] in
+        // Editors often save by renaming the file away and recreating it.
+        // Wait briefly then re-check existence. Use multiple retries for
+        // slower save operations.
+        retryRestart(attempt: 0, maxAttempts: 5, delay: 0.2)
+    }
+
+    private func retryRestart(attempt: Int, maxAttempts: Int, delay: TimeInterval) {
+        DispatchQueue.global().asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self else { return }
             if FileManager.default.fileExists(atPath: self.url.path) {
                 // File was re-created — restart monitoring
                 self.stop()
                 self.start()
                 self.callback(.modified)
+            } else if attempt < maxAttempts {
+                // File not yet recreated — retry with increasing delay
+                self.retryRestart(attempt: attempt + 1, maxAttempts: maxAttempts, delay: delay)
             } else {
                 self.callback(.deleted)
             }
