@@ -11,7 +11,6 @@ class WindowManager: ObservableObject {
     var openWindowAction: OpenWindowAction?
 
     /// Test-only hook: called instead of `openWindowAction` when set.
-    /// Allows unit tests to exercise openFile() without a real SwiftUI environment.
     var _testOpenWindowHandler: ((URL) -> Void)?
 
     func openFile(_ url: URL) {
@@ -21,14 +20,24 @@ class WindowManager: ObservableObject {
             return
         }
 
-        // In tests, use the test handler; in production, use the real action.
         if let testHandler = _testOpenWindowHandler {
             testHandler(resolved)
-        } else {
-            guard let action = openWindowAction else { return }
+            openFiles.insert(resolved)
+        } else if let action = openWindowAction {
             action(value: resolved)
+            openFiles.insert(resolved)
+        } else {
+            // Cold start fallback: openWindowAction not yet available.
+            // Use NSWorkspace to open the file, which triggers handlesExternalEvents
+            // and creates a new WindowGroup scene for the URL.
+            NSWorkspace.shared.open(url)
         }
-        openFiles.insert(resolved)
+    }
+
+    /// Register a file as open (called from PreviewView.onAppear for windows
+    /// created externally via Finder, Dock drop, or NSWorkspace fallback).
+    func registerFile(_ url: URL) {
+        openFiles.insert(url.standardizedFileURL)
     }
 
     func closeFile(_ url: URL) {
@@ -52,8 +61,6 @@ class WindowManager: ObservableObject {
 
     private func bringToFront(_ url: URL) {
         for window in NSApp.windows {
-            // Match by representedURL (full file URL) for accurate identification
-            // when multiple files share the same basename.
             if window.representedURL == url {
                 window.makeKeyAndOrderFront(nil)
                 return

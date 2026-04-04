@@ -1,0 +1,9 @@
+The patch has functional issues in its window-management flow. A fresh app launch cannot open the first file from the menu, and externally created document windows are not tracked for duplicate suppression.
+
+Full review comments:
+
+- [P1] Handle the first File > Open before any window exists — /Users/justinwulf/Documents/justin/work/querylift/service/stillmd/MarkdownPreviewer/Services/WindowManager.swift:28-29
+  When the app is launched from Dock/Launchpad with no document window yet, `OpenWindowInjector` has never populated `openWindowAction`, so the first `File > Open…`/`⌘O` selection hits this guard and is silently dropped. That makes cold-start opens impossible unless the user first opens a file through some external path that creates a URL-backed window.
+
+- [P2] Track URL-backed windows created outside WindowManager — /Users/justinwulf/Documents/justin/work/querylift/service/stillmd/MarkdownPreviewer/Views/PreviewView.swift:29-31
+  This view path is used for windows opened directly by Finder, Dock drops, or markdown-to-markdown links, but it only starts the watcher; it never registers the file in `windowManager.openFiles`. Because duplicate detection consults only that set, opening the same document later via `⌘O` or drag-and-drop creates a second window instead of focusing the existing one, breaking the advertised one-window-per-file behavior for those entry points.

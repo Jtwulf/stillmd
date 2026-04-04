@@ -27,6 +27,9 @@ struct PreviewView: View {
         .navigationTitle(fileURL.lastPathComponent)
         .background(WindowAccessor(url: fileURL.standardizedFileURL))
         .onAppear {
+            // Register this file in WindowManager for duplicate detection,
+            // regardless of how the window was created (Finder, Dock, NSWorkspace, etc.)
+            windowManager.registerFile(fileURL)
             viewModel.startWatching()
         }
         .onDisappear {
