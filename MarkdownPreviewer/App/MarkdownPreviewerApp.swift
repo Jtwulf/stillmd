@@ -1,7 +1,16 @@
 import SwiftUI
 
+enum WindowDefaults {
+    // Keep launch size compact without making typical Markdown content feel cramped.
+    static let defaultWidth: CGFloat = 720
+    static let defaultHeight: CGFloat = 520
+    static let minimumWidth: CGFloat = 600
+    static let minimumHeight: CGFloat = 400
+}
+
 @main
 struct MarkdownPreviewerApp: App {
+
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var windowManager = WindowManager()
     @AppStorage(AppPreferences.themeKey) private var themePreferenceRawValue =
@@ -14,8 +23,16 @@ struct MarkdownPreviewerApp: App {
     var body: some Scene {
         WindowGroup(for: URL.self) { $url in
             RootView(fileURL: $url, windowManager: windowManager)
-                .preferredColorScheme(themePreference.colorScheme)
-                .frame(minWidth: 600, minHeight: 400)
+                .frame(
+                    minWidth: WindowDefaults.minimumWidth,
+                    minHeight: WindowDefaults.minimumHeight
+                )
+                .background(
+                    LaunchWindowSizer(
+                        width: WindowDefaults.defaultWidth,
+                        height: WindowDefaults.defaultHeight
+                    )
+                )
         }
         .commands {
             FindCommands()
@@ -26,12 +43,11 @@ struct MarkdownPreviewerApp: App {
                 .keyboardShortcut("o", modifiers: .command)
             }
         }
-        .defaultSize(width: 860, height: 700)
-
-        Settings {
-            SettingsView()
-                .preferredColorScheme(themePreference.colorScheme)
-        }
+        .restorationBehavior(.disabled)
+        .defaultSize(
+            width: WindowDefaults.defaultWidth,
+            height: WindowDefaults.defaultHeight
+        )
     }
 }
 
