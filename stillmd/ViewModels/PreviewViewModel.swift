@@ -10,10 +10,19 @@ class PreviewViewModel: ObservableObject {
 
     private var fileWatcher: FileWatcher?
     private var recoveryTask: Task<Void, Never>?
+    /// `NSOpenPanel` / sandbox user-selected files need a matching `stopAccessing…` in `deinit`.
+    private let holdsSecurityScopedAccess: Bool
 
     init(fileURL: URL) {
         self.fileURL = fileURL
+        self.holdsSecurityScopedAccess = fileURL.startAccessingSecurityScopedResource()
         loadFile()
+    }
+
+    deinit {
+        if holdsSecurityScopedAccess {
+            fileURL.stopAccessingSecurityScopedResource()
+        }
     }
 
     func startWatching() {

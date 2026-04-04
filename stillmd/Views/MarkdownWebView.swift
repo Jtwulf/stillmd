@@ -1,5 +1,34 @@
+import AppKit
 import SwiftUI
 import WebKit
+
+/// Hosts a `WKWebView` with edge constraints. Returning `WKWebView` directly from `NSViewRepresentable`
+/// often yields a zero-height layout inside `NSHostingView`; the container guarantees a non-zero clip rect.
+final class StillmdMarkdownWebContainerView: NSView {
+    let webView: WKWebView
+
+    init(webView: WKWebView) {
+        self.webView = webView
+        super.init(frame: .zero)
+        translatesAutoresizingMaskIntoConstraints = false
+        webView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(webView)
+        NSLayoutConstraint.activate([
+            webView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            webView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            webView.topAnchor.constraint(equalTo: topAnchor),
+            webView.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+        setContentHuggingPriority(.defaultLow, for: .vertical)
+        setContentHuggingPriority(.defaultLow, for: .horizontal)
+        setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+        setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+}
 
 struct MarkdownWebView: NSViewRepresentable {
     let markdownContent: String
@@ -12,7 +41,7 @@ struct MarkdownWebView: NSViewRepresentable {
     let findRequest: FindRequest?
     @Binding var findStatus: FindStatus
 
-    func makeNSView(context: Context) -> WKWebView {
+    func makeNSView(context: Context) -> StillmdMarkdownWebContainerView {
         let config = WKWebViewConfiguration()
 
         let userController = WKUserContentController()
@@ -24,10 +53,6 @@ struct MarkdownWebView: NSViewRepresentable {
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
         webView.setValue(false, forKey: "drawsBackground")
-        webView.setContentHuggingPriority(.defaultLow, for: .vertical)
-        webView.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        webView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
-        webView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         let html = HTMLTemplate.build(
             markdownContent: markdownContent,
@@ -47,10 +72,11 @@ struct MarkdownWebView: NSViewRepresentable {
         context.coordinator.lastDocumentLineNumbersVisible = documentLineNumbersVisible
         context.coordinator.lastFindQuery = findQuery
 
-        return webView
+        return StillmdMarkdownWebContainerView(webView: webView)
     }
 
-    func updateNSView(_ webView: WKWebView, context: Context) {
+    func updateNSView(_ container: StillmdMarkdownWebContainerView, context: Context) {
+        let webView = container.webView
         context.coordinator.parent = self
 
         guard markdownContent != context.coordinator.lastContent else {
