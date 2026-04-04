@@ -1,13 +1,15 @@
 #!/bin/bash
 set -euo pipefail
 
-# Build StillMD.app bundle from Swift Package Manager project
+# Build stillmd.app bundle from Swift Package Manager project
 # Usage: ./scripts/build-app.sh [--release]
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-APP_NAME="StillMD"
+APP_NAME="stillmd"
 BUNDLE_ID="com.jtwulf.stillmd"
+ICON_SOURCE="$PROJECT_DIR/assets/app-icon/stillmd-icon.png"
+ICON_NAME="AppIcon"
 
 # Parse args
 BUILD_CONFIG="debug"
@@ -40,6 +42,32 @@ mkdir -p "$RESOURCES_DIR"
 # Copy executable
 cp "$BINARY_PATH" "$MACOS_DIR/$APP_NAME"
 
+# Build app icon from the source PNG when available
+if [[ -f "$ICON_SOURCE" ]]; then
+    ICONSET_DIR="$PROJECT_DIR/build/${ICON_NAME}.iconset"
+    ICON_ICNS_PATH="$PROJECT_DIR/build/${ICON_NAME}.icns"
+
+    rm -rf "$ICONSET_DIR" "$ICON_ICNS_PATH"
+    mkdir -p "$ICONSET_DIR"
+
+    sips -z 16 16     "$ICON_SOURCE" --out "$ICONSET_DIR/icon_16x16.png" >/dev/null
+    sips -z 32 32     "$ICON_SOURCE" --out "$ICONSET_DIR/icon_16x16@2x.png" >/dev/null
+    sips -z 32 32     "$ICON_SOURCE" --out "$ICONSET_DIR/icon_32x32.png" >/dev/null
+    sips -z 64 64     "$ICON_SOURCE" --out "$ICONSET_DIR/icon_32x32@2x.png" >/dev/null
+    sips -z 128 128   "$ICON_SOURCE" --out "$ICONSET_DIR/icon_128x128.png" >/dev/null
+    sips -z 256 256   "$ICON_SOURCE" --out "$ICONSET_DIR/icon_128x128@2x.png" >/dev/null
+    sips -z 256 256   "$ICON_SOURCE" --out "$ICONSET_DIR/icon_256x256.png" >/dev/null
+    sips -z 512 512   "$ICON_SOURCE" --out "$ICONSET_DIR/icon_256x256@2x.png" >/dev/null
+    sips -z 512 512   "$ICON_SOURCE" --out "$ICONSET_DIR/icon_512x512.png" >/dev/null
+    cp "$ICON_SOURCE" "$ICONSET_DIR/icon_512x512@2x.png"
+
+    iconutil -c icns "$ICONSET_DIR" -o "$ICON_ICNS_PATH"
+    cp "$ICON_ICNS_PATH" "$RESOURCES_DIR/${ICON_NAME}.icns"
+    echo "  Built app icon: ${ICON_NAME}.icns"
+else
+    echo "  WARNING: Icon source not found at $ICON_SOURCE"
+fi
+
 # Copy Info.plist and add bundle metadata
 cat > "$CONTENTS_DIR/Info.plist" << PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -53,7 +81,9 @@ cat > "$CONTENTS_DIR/Info.plist" << PLIST
     <key>CFBundleName</key>
     <string>$APP_NAME</string>
     <key>CFBundleDisplayName</key>
-    <string>StillMD</string>
+    <string>stillmd</string>
+    <key>CFBundleIconFile</key>
+    <string>$ICON_NAME</string>
     <key>CFBundleVersion</key>
     <string>1.0.0</string>
     <key>CFBundleShortVersionString</key>

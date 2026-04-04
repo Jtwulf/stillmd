@@ -1,4 +1,4 @@
-# StillMD (MarkdownPreviewer)
+# stillmd (MarkdownPreviewer)
 
 A lightweight, preview-only Markdown viewer for macOS.
 
