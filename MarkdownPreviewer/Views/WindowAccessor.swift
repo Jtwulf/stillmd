@@ -28,6 +28,8 @@ private final class StillmdDocumentTitleAccessoryController: NSTitlebarAccessory
         self.hostingView = NSHostingView(rootView: root)
         super.init(nibName: nil, bundle: nil)
         self.view = hostingView
+        // `.leading` places the accessory on the titlebar row beside the traffic lights.
+        // `.bottom` would render below the titlebar, which breaks the unified chrome row.
         layoutAttribute = .leading
         fullScreenMinHeight = 28
     }
@@ -156,7 +158,6 @@ struct WindowAccessor: NSViewRepresentable {
         }
 
         coordinator.syncDocumentTitleAccessory(on: window, title: title, colorScheme: colorScheme)
-        coordinator.updateTitleAccessoryLayout(for: window)
     }
 
     @MainActor
@@ -174,7 +175,6 @@ struct WindowAccessor: NSViewRepresentable {
         private var lifecycleReapply: (() -> Void)?
         private var documentTitleAccessory: StillmdDocumentTitleAccessoryController?
         private weak var accessoryWindow: NSWindow?
-        private var widthConstraint: NSLayoutConstraint?
 
         func teardown() {
             // Invalidate any in-flight delayed reapply work from `updateWindow`.
@@ -187,8 +187,6 @@ struct WindowAccessor: NSViewRepresentable {
             }
             documentTitleAccessory = nil
             accessoryWindow = nil
-            widthConstraint?.isActive = false
-            widthConstraint = nil
         }
 
         func startWindowLifecycleObserversIfNeeded(for window: NSWindow, reapply: @escaping () -> Void) {
@@ -245,8 +243,6 @@ struct WindowAccessor: NSViewRepresentable {
                     }
                     documentTitleAccessory = nil
                     accessoryWindow = nil
-                    widthConstraint?.isActive = false
-                    widthConstraint = nil
                 }
             }
 
@@ -260,24 +256,6 @@ struct WindowAccessor: NSViewRepresentable {
             documentTitleAccessory = accessory
             accessoryWindow = window
             window.addTitlebarAccessoryViewController(accessory)
-
-            let hosting = accessory.view
-            hosting.translatesAutoresizingMaskIntoConstraints = false
-            updateTitleAccessoryLayout(for: window)
-        }
-
-        func updateTitleAccessoryLayout(for window: NSWindow) {
-            guard let hosting = documentTitleAccessory?.view else { return }
-            guard let content = window.contentView else { return }
-
-            if widthConstraint == nil || accessoryWindow !== window {
-                widthConstraint?.isActive = false
-                let constraint = hosting.widthAnchor.constraint(equalTo: content.widthAnchor)
-                constraint.priority = NSLayoutConstraint.Priority.defaultHigh
-                constraint.isActive = true
-                widthConstraint = constraint
-            }
-            accessoryWindow = window
         }
     }
 }
