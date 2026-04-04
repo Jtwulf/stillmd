@@ -2,6 +2,14 @@
 
 A lightweight, preview-only Markdown viewer for macOS.
 
+## Project Docs
+
+- Agent entry point: `AGENTS.md`
+- Design constitution: `DESIGN.md`
+- Implementation rules: `docs/rules/`
+
+Internal project rules are maintained in Japanese. The public README remains English.
+
 ## System Requirements
 
 - macOS 15.5+
