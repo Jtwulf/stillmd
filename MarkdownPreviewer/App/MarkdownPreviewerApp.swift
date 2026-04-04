@@ -6,14 +6,9 @@ struct MarkdownPreviewerApp: App {
 
     var body: some Scene {
         WindowGroup(for: URL.self) { $url in
-            if let url {
-                OpenWindowInjector(windowManager: windowManager) {
-                    PreviewView(fileURL: url, windowManager: windowManager)
-                        .frame(minWidth: 600, minHeight: 400)
-                }
-            }
+            RootView(fileURL: $url, windowManager: windowManager)
+                .frame(minWidth: 600, minHeight: 400)
         }
-        .handlesExternalEvents(matching: ["file"])
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("Open…") {
