@@ -66,18 +66,39 @@ struct MarkdownWebView: NSViewRepresentable {
             decidePolicyFor navigationAction: WKNavigationAction,
             decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
         ) {
-            if let url = navigationAction.request.url, url.scheme == "javascript" {
+            guard let url = navigationAction.request.url else {
+                decisionHandler(.allow)
+                return
+            }
+
+            // Block javascript: scheme unconditionally
+            if url.scheme == "javascript" {
                 decisionHandler(.cancel)
                 return
             }
-            if navigationAction.navigationType == .linkActivated,
-               let url = navigationAction.request.url,
-               url.scheme == "http" || url.scheme == "https" {
+
+            // Only allow non-link-activated navigations (initial load, etc.)
+            guard navigationAction.navigationType == .linkActivated else {
+                decisionHandler(.allow)
+                return
+            }
+
+            // External http/https links → open in system browser
+            if url.scheme == "http" || url.scheme == "https" {
                 NSWorkspace.shared.open(url)
                 decisionHandler(.cancel)
                 return
             }
-            decisionHandler(.allow)
+
+            // file: links (relative .md links resolved by baseURL) → block navigation,
+            // could be opened as a new preview window in the future
+            if url.scheme == "file" {
+                decisionHandler(.cancel)
+                return
+            }
+
+            // Block all other link-activated navigations
+            decisionHandler(.cancel)
         }
 
         // MARK: - WKScriptMessageHandler

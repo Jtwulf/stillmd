@@ -1,0 +1,12 @@
+Core opening flows are broken because `windowManager.openFile(_:)` is never wired to a real `openWindow` action, and some advertised file-handling behaviors are not implemented end-to-end. As written, the patch does not reliably deliver the main app functionality it adds.
+
+Full review comments:
+
+- [P1] Initialize `openWindowAction` before calling `openFile` — /Users/justinwulf/Documents/justin/work/querylift/service/stillmd/MarkdownPreviewer/App/MarkdownPreviewerApp.swift:8-10
+  `WindowManager.openFile(_:)` can only create a window when `openWindowAction` has been injected, but this scene never installs the new `OpenWindowInjector` (and nothing else assigns that property). In production that leaves `openWindowAction` nil for the lifetime of the app, so every path that calls `windowManager.openFile(_:)`—including File > Open and dropped files—returns without opening anything.
+
+- [P2] Handle relative file links instead of allowing raw file navigation — /Users/justinwulf/Documents/justin/work/querylift/service/stillmd/MarkdownPreviewer/Views/MarkdownWebView.swift:73-80
+  This only special-cases `http`/`https` links, but `PreviewView` passes the markdown file’s parent directory as the web view `baseURL`, so links like `[other](docs/other.md)` resolve to `file:` URLs. Those clicks are therefore allowed to navigate the `WKWebView` directly to the target file, which shows the raw file instead of opening another preview window and breaks the advertised relative-link behavior.
+
+- [P2] Package the document-type metadata into the built app — /Users/justinwulf/Documents/justin/work/querylift/service/stillmd/Package.swift:10-18
+  The target is defined as a plain SwiftPM executable, and `Info.plist` is never referenced here, so the produced artifact from `swift build`/`swift run` will not carry the new `CFBundleDocumentTypes` or UTI declarations. That means Finder-facing features introduced in this patch—default-app association, “Open With”, and opening `.md` files via the built product—won’t work even though the plist exists in the repository.
