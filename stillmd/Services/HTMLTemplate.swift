@@ -9,7 +9,8 @@ enum HTMLTemplate {
         initialScrollPosition: Double = 0,
         themePreference: String = ThemePreference.system.rawValue,
         textScale: Double = AppPreferences.defaultTextScale,
-        documentLineNumbersVisible: Bool = false
+        documentLineNumbersVisible: Bool = false,
+        documentBaseURL: URL? = nil
     ) -> String {
         // Base64 keeps `${…}`, backticks, quotes, and `</script>` from breaking out of the HTML `<script>` block
         // or being interpreted as JS (template literals / unterminated strings → blank WebView).
@@ -17,6 +18,14 @@ enum HTMLTemplate {
         let escapedThemePreference = themePreference
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
+        let baseTag = documentBaseURL.map { url in
+            let href = url.absoluteString
+                .replacingOccurrences(of: "&", with: "&amp;")
+                .replacingOccurrences(of: "\"", with: "&quot;")
+                .replacingOccurrences(of: "<", with: "&lt;")
+                .replacingOccurrences(of: ">", with: "&gt;")
+            return "<base href=\"\(href)\">"
+        } ?? ""
 
         return """
         <!DOCTYPE html>
@@ -24,6 +33,7 @@ enum HTMLTemplate {
         <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
+            \(baseTag)
             <style>\(css)</style>
             <script>\(markedJS)</script>
             <script>\(highlightJS)</script>
@@ -34,6 +44,8 @@ enum HTMLTemplate {
             </div>
             <div id="content"></div>
             <script>
+                try {
+                window.__stillmdBootPhase = 'script-start';
                 // Strip raw HTML blocks from markdown output for security.
                 // This prevents injected <img onerror=...>, <script>, javascript: links, etc.
                 marked.use({
@@ -68,13 +80,16 @@ enum HTMLTemplate {
                 }
 
                 // Initial render (see Swift: markdownBase64)
+                window.__stillmdBootPhase = 'before-initial-render';
                 const md = stillmdMarkdownFromBase64('\(markdownBase64)');
                 const contentElement = document.getElementById('content');
                 const documentLineNumberOverlay = document.getElementById('document-line-number-overlay');
                 const documentLineNumberColumn = document.getElementById('document-line-number-column');
                 const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-                const scrollHandler = window.webkit.messageHandlers.scrollPosition;
-                const findResultsHandler = window.webkit.messageHandlers.findResults;
+                const messageHandlers = window.webkit?.messageHandlers ?? {};
+                const scrollHandler = messageHandlers.scrollPosition ?? null;
+                const findResultsHandler = messageHandlers.findResults ?? null;
+                const linkClickedHandler = messageHandlers.linkClicked ?? null;
                 const initialScrollY = \(initialScrollPosition);
                 const initialThemePreference = "\(escapedThemePreference)";
                 const initialTextScale = \(textScale);
@@ -87,6 +102,13 @@ enum HTMLTemplate {
                 let findMatches = [];
                 let findState = { currentIndex: -1 };
                 let documentLineNumberLayoutPending = false;
+                window.__stillmdBootPhase = 'state-ready';
+
+                function postMessageIfAvailable(handler, payload) {
+                    if (handler && typeof handler.postMessage === 'function') {
+                        handler.postMessage(payload);
+                    }
+                }
 
                 function escapeHTML(value) {
                     return value
@@ -116,7 +138,7 @@ enum HTMLTemplate {
 
                     const language = getCodeLanguage(codeElement);
                     const rawText = codeElement.textContent || '';
-                    const lines = rawText.split(/\r?\n/);
+                    const lines = rawText.split(/\\r?\\n/);
 
                     const block = document.createElement('div');
                     block.className = 'stillmd-code-block';
@@ -254,7 +276,7 @@ enum HTMLTemplate {
                 }
 
                 function publishFindResults() {
-                    findResultsHandler.postMessage({
+                    postMessageIfAvailable(findResultsHandler, {
                         matchCount: findMatches.length,
                         currentIndex: findState.currentIndex,
                     });
@@ -439,7 +461,7 @@ enum HTMLTemplate {
                         }
                         if (url.protocol === 'http:' || url.protocol === 'https:') {
                             e.preventDefault();
-                            window.webkit.messageHandlers.linkClicked.postMessage(link.href);
+                            postMessageIfAvailable(linkClickedHandler, link.href);
                         }
                     }
                 });
@@ -449,13 +471,14 @@ enum HTMLTemplate {
                     applyTheme();
                 }
                 mediaQuery.addEventListener('change', updateTheme);
+                window.__stillmdBootPhase = 'theme-ready';
                 setThemePreference(initialThemePreference);
                 setTextScale(initialTextScale);
                 setDocumentLineNumbersVisible(initialDocumentLineNumbersVisible);
 
                 let scrollState = { pending: false };
                 function reportScroll() {
-                    scrollHandler.postMessage(window.scrollY);
+                    postMessageIfAvailable(scrollHandler, window.scrollY);
                 }
                 function scheduleScrollReport() {
                     if (scrollState.pending) {
@@ -488,9 +511,21 @@ enum HTMLTemplate {
                 resizeObserver.observe(contentElement);
                 resizeObserver.observe(document.body);
                 window.addEventListener('resize', scheduleDocumentLineNumberLayout);
+                window.__stillmdBootPhase = 'before-render';
 
                 renderMarkdown(md);
+                window.__stillmdBootPhase = 'after-render';
                 restoreScrollPosition(initialScrollY);
+                window.__stillmdBootPhase = 'ready';
+                } catch (error) {
+                    window.__stillmdBootPhase = 'caught-error';
+                    window.__stillmdLastError = error && error.stack ? String(error.stack) : String(error);
+                    const contentElement = document.getElementById('content');
+                    if (contentElement && !contentElement.innerHTML) {
+                        contentElement.innerHTML = '<pre class="stillmd-render-error"></pre>';
+                        contentElement.firstChild.textContent = window.__stillmdLastError;
+                    }
+                }
             </script>
         </body>
         </html>

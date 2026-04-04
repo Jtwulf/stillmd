@@ -2,6 +2,42 @@ import AppKit
 import SwiftUI
 import WebKit
 
+enum StillmdWebViewLogger {
+    static func log(_ message: String) {
+        fputs("[stillmd][WKWebView] \(message)\n", stderr)
+    }
+}
+
+enum StillmdWebViewConfiguration {
+    @MainActor
+    static func make(userContentController: WKUserContentController) -> WKWebViewConfiguration {
+        let config = WKWebViewConfiguration()
+        let diagnosticScript = WKUserScript(
+            source: """
+            window.__stillmdLastError = null;
+            window.__stillmdBootPhase = 'document-start';
+            window.addEventListener('error', function(event) {
+                const message = event?.message || 'unknown script error';
+                const filename = event?.filename || 'unknown';
+                const line = event?.lineno || 0;
+                const column = event?.colno || 0;
+                window.__stillmdLastError = `${message} @ ${filename}:${line}:${column}`;
+            });
+            window.addEventListener('unhandledrejection', function(event) {
+                const reason = event?.reason;
+                window.__stillmdLastError = reason ? String(reason) : 'unhandled promise rejection';
+            });
+            """,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        )
+        userContentController.addUserScript(diagnosticScript)
+        config.userContentController = userContentController
+        config.defaultWebpagePreferences.allowsContentJavaScript = true
+        return config
+    }
+}
+
 /// Hosts a `WKWebView` stretched to the frame SwiftUI/`NSHostingView` assigns.
 /// Pure Auto Layout on the container failed for some users; classic autoresizing + `layout()` is more reliable here.
 final class StillmdMarkdownWebContainerView: NSView {
@@ -23,6 +59,9 @@ final class StillmdMarkdownWebContainerView: NSView {
     override func layout() {
         super.layout()
         webView.frame = bounds
+        if bounds.width < 1 || bounds.height < 1 {
+            StillmdWebViewLogger.log("container laid out with tiny bounds: \(bounds.debugDescription)")
+        }
     }
 }
 
@@ -44,13 +83,11 @@ struct MarkdownWebView: NSViewRepresentable {
     func makeNSView(context: Context) -> StillmdMarkdownWebContainerView {
         onWillLoadWebContent?()
 
-        let config = WKWebViewConfiguration()
-
         let userController = WKUserContentController()
         userController.add(context.coordinator, name: "scrollPosition")
         userController.add(context.coordinator, name: "linkClicked")
         userController.add(context.coordinator, name: "findResults")
-        config.userContentController = userController
+        let config = StillmdWebViewConfiguration.make(userContentController: userController)
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
@@ -65,9 +102,10 @@ struct MarkdownWebView: NSViewRepresentable {
             initialScrollPosition: Double(scrollPosition),
             themePreference: themePreference.rawValue,
             textScale: textScale,
-            documentLineNumbersVisible: documentLineNumbersVisible
+            documentLineNumbersVisible: documentLineNumbersVisible,
+            documentBaseURL: baseURL
         )
-        webView.loadHTMLString(html, baseURL: baseURL)
+        webView.loadHTMLString(html, baseURL: nil)
 
         context.coordinator.lastContent = markdownContent
         context.coordinator.lastThemePreference = themePreference.rawValue
@@ -154,7 +192,10 @@ struct MarkdownWebView: NSViewRepresentable {
     }
 
     private func evaluateJavaScript(_ script: String, in webView: WKWebView) {
-        webView.evaluateJavaScript(script)
+        webView.evaluateJavaScript(script) { _, error in
+            guard let error else { return }
+            StillmdWebViewLogger.log("evaluateJavaScript failed: \(error.localizedDescription)")
+        }
     }
 
     private static func javaScriptStringLiteral(_ value: String) -> String {
@@ -192,6 +233,27 @@ struct MarkdownWebView: NSViewRepresentable {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             // `loadHTMLString` では環境によって `didCommit` が期待どおり来ないことがあるためフォールバック。
             reportInitialNavigationIfNeeded()
+            runDiagnostics(in: webView)
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            didFailProvisionalNavigation navigation: WKNavigation!,
+            withError error: Error
+        ) {
+            StillmdWebViewLogger.log("didFailProvisionalNavigation: \(error.localizedDescription)")
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            didFail navigation: WKNavigation!,
+            withError error: Error
+        ) {
+            StillmdWebViewLogger.log("didFailNavigation: \(error.localizedDescription)")
+        }
+
+        func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+            StillmdWebViewLogger.log("web content process terminated")
         }
 
         private func reportInitialNavigationIfNeeded() {
@@ -200,6 +262,42 @@ struct MarkdownWebView: NSViewRepresentable {
             let callback = parent.onInitialNavigationCommitted
             DispatchQueue.main.async {
                 callback?()
+            }
+        }
+
+        private func runDiagnostics(in webView: WKWebView) {
+            let script = """
+            (() => ({
+                markedType: typeof marked,
+                hljsType: typeof hljs,
+                bootPhase: window.__stillmdBootPhase ?? '',
+                lastError: window.__stillmdLastError ?? '',
+                webkitType: typeof window.webkit,
+                scrollHandlerType: typeof window.webkit?.messageHandlers?.scrollPosition,
+                contentLength: document.getElementById('content')?.innerHTML?.length ?? -1,
+                scrollHeight: document.body?.scrollHeight ?? -1,
+                innerWidth: window.innerWidth ?? -1,
+                innerHeight: window.innerHeight ?? -1
+            }))()
+            """
+
+            webView.evaluateJavaScript(script) { [weak self] value, error in
+                if let error {
+                    StillmdWebViewLogger.log("diagnostic probe failed: \(error.localizedDescription)")
+                    return
+                }
+
+                guard let info = value as? [String: Any] else { return }
+                let contentLength = info["contentLength"] as? Int ?? -1
+                let innerHeight = info["innerHeight"] as? Int ?? -1
+                if contentLength <= 0 || innerHeight <= 0 {
+                    let summary = info
+                        .sorted { $0.key < $1.key }
+                        .map { "\($0.key)=\($0.value)" }
+                        .joined(separator: ", ")
+                    let fileName = self?.parent.baseURL.lastPathComponent ?? "unknown"
+                    StillmdWebViewLogger.log("suspicious render state for \(fileName): \(summary)")
+                }
             }
         }
 
