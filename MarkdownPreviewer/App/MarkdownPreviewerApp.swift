@@ -22,25 +22,17 @@ struct MarkdownPreviewerApp: App {
     }
 }
 
-/// NSApplicationDelegate to handle Finder "Open With" and file double-click events.
+/// Handles Finder "Open With" / file double-click events.
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
-    /// Pending URLs received before the SwiftUI scene is ready.
+    /// URLs received before the first window's onAppear fires.
     static var pendingURLs: [URL] = []
-    /// Reference to openWindow action, set by RootView on appear.
-    static var openWindowAction: OpenWindowAction?
 
     func application(_ application: NSApplication, open urls: [URL]) {
         let mdURLs = urls.filter { FileValidation.isMarkdownFile($0) }
         guard !mdURLs.isEmpty else { return }
-
-        if let action = AppDelegate.openWindowAction {
-            for url in mdURLs {
-                action(value: url)
-            }
-        } else {
-            // Scene not ready yet — store for later
-            AppDelegate.pendingURLs.append(contentsOf: mdURLs)
-        }
+        // Always queue — RootView.onAppear will consume them.
+        // This avoids creating a second window via openWindow().
+        AppDelegate.pendingURLs.append(contentsOf: mdURLs)
     }
 }

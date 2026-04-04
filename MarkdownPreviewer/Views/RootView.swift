@@ -1,11 +1,14 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Root view that handles both the empty state (no file) and the preview state.
 struct RootView: View {
     @Binding var fileURL: URL?
     @ObservedObject var windowManager: WindowManager
     @Environment(\.openWindow) private var openWindow
+
+    // Timer to check for pending URLs from AppDelegate.
+    // application(_:open:) can fire slightly after onAppear.
+    @State private var pendingCheckTimer: Timer?
 
     var body: some View {
         Group {
@@ -19,24 +22,47 @@ struct RootView: View {
         }
         .onAppear {
             windowManager.openWindowAction = openWindow
-            AppDelegate.openWindowAction = openWindow
+            consumePendingURLs()
 
-            // Process any URLs that arrived before the scene was ready
-            // (e.g., Finder "Open With" on cold start)
-            if fileURL == nil, let firstURL = AppDelegate.pendingURLs.first {
-                // Open the first pending URL in this window
-                fileURL = firstURL
-                // Open remaining URLs in new windows
-                for url in AppDelegate.pendingURLs.dropFirst() {
-                    openWindow(value: url)
+            // Keep checking for a short period in case application(_:open:)
+            // fires after onAppear (common on cold start).
+            pendingCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+                Task { @MainActor in
+                    consumePendingURLs()
                 }
-                AppDelegate.pendingURLs.removeAll()
             }
+            // Stop checking after 2 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                pendingCheckTimer?.invalidate()
+                pendingCheckTimer = nil
+            }
+        }
+        .onDisappear {
+            pendingCheckTimer?.invalidate()
+            pendingCheckTimer = nil
         }
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
             handleDrop(providers)
         }
         .navigationTitle(fileURL?.lastPathComponent ?? "StillMD")
+    }
+
+    private func consumePendingURLs() {
+        guard !AppDelegate.pendingURLs.isEmpty else { return }
+
+        if fileURL == nil {
+            // This window has no file — use the first pending URL here
+            fileURL = AppDelegate.pendingURLs.removeFirst()
+        }
+        // Open remaining URLs in new windows
+        for url in AppDelegate.pendingURLs {
+            openWindow(value: url)
+        }
+        AppDelegate.pendingURLs.removeAll()
+
+        // Stop the timer once we've consumed URLs
+        pendingCheckTimer?.invalidate()
+        pendingCheckTimer = nil
     }
 
     private func openFileInCurrentWindow() {
@@ -69,7 +95,6 @@ struct RootView: View {
     }
 }
 
-/// Shown when the app launches without a file.
 struct EmptyStateView: View {
     let onOpen: () -> Void
 
