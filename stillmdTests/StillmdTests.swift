@@ -231,12 +231,15 @@ struct HTMLTemplateUnitTests {
         #expect(html.contains("Hello **world**"))
     }
 
-    // --- highlight.js Integration ---
+    // --- Code Block Rendering ---
 
-    @Test("Contains hljs.highlightAll()")
-    func containsHighlightAll() {
-        let html = buildHTML(from: "test")
-        #expect(html.contains("hljs.highlightAll()"))
+    @Test("Contains code block renderer and line number markup")
+    func containsCodeBlockRenderer() {
+        let html = buildHTML(from: "```swift\nlet x = 1\n```")
+        #expect(html.contains("function decorateCodeBlocks"))
+        #expect(html.contains("function renderCodeBlock"))
+        #expect(html.contains("stillmd-code-block"))
+        #expect(html.contains("stillmd-code-line-number"))
     }
 
     // --- Dark Mode Detection ---
@@ -333,6 +336,23 @@ struct HTMLTemplateUnitTests {
     func containsContentDiv() {
         let html = buildHTML(from: "test")
         #expect(html.contains("<div id=\"content\"></div>"))
+    }
+
+    @Test("Contains document line number overlay and toggle hook")
+    func containsDocumentLineNumberOverlay() {
+        let html = buildHTML(from: "test")
+        #expect(html.contains("document-line-number-overlay"))
+        #expect(html.contains("document-line-number-column"))
+        #expect(html.contains("function setDocumentLineNumbersVisible"))
+        #expect(html.contains("scheduleDocumentLineNumberLayout"))
+    }
+
+    @Test("Contains default code block line number decorator")
+    func containsDefaultCodeBlockLineNumbers() {
+        let html = buildHTML(from: "```swift\nlet x = 1\n```")
+        #expect(html.contains("stillmd-code-block"))
+        #expect(html.contains("stillmd-code-line-number"))
+        #expect(html.contains("function decorateCodeBlocks"))
     }
 
     // --- External Link Interception ---
@@ -1009,6 +1029,15 @@ struct AppPreferencesUnitTests {
         #expect(AppPreferences.clampedTextScale(2.0) == AppPreferences.textScaleRange.upperBound)
         #expect(AppPreferences.clampedTextScale(1.1) == 1.1)
     }
+
+    @Test("Text scale helpers step and reset within supported range")
+    func textScaleHelpersStepAndReset() {
+        #expect(AppPreferences.increasedTextScale(1.0) == 1.05)
+        #expect(AppPreferences.decreasedTextScale(1.0) == 0.95)
+        #expect(AppPreferences.resetTextScale() == AppPreferences.defaultTextScale)
+        #expect(AppPreferences.increasedTextScale(AppPreferences.textScaleRange.upperBound) == AppPreferences.textScaleRange.upperBound)
+        #expect(AppPreferences.decreasedTextScale(AppPreferences.textScaleRange.lowerBound) == AppPreferences.textScaleRange.lowerBound)
+    }
 }
 
 
@@ -1637,8 +1666,10 @@ struct CodeBlockHighlightingPropertyTests {
                     "HTML should contain hljs.highlight for syntax highlighting (iteration \(i))")
             #expect(html.contains("hljs.getLanguage"),
                     "HTML should contain hljs.getLanguage for language detection (iteration \(i))")
-            #expect(html.contains("hljs.highlightAll()"),
-                    "HTML should contain hljs.highlightAll() call (iteration \(i))")
+            #expect(html.contains("function decorateCodeBlocks"),
+                    "HTML should contain the code block decorator (iteration \(i))")
+            #expect(html.contains("stillmd-code-line-number"),
+                    "HTML should contain code line number markup (iteration \(i))")
         }
     }
 

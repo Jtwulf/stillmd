@@ -1,5 +1,7 @@
 :root {
     --text-scale: 1;
+    --document-line-number-gutter-width: 0px;
+    --code-line-number-width: 3.25ch;
     --bg-color: #fcfcfa;
     --text-color: #202124;
     --heading-color: #17181b;
@@ -20,6 +22,8 @@
 
 [data-theme="dark"] {
     --text-scale: 1;
+    --document-line-number-gutter-width: 0px;
+    --code-line-number-width: 3.25ch;
     --bg-color: #151618;
     --text-color: #e2e0da;
     --heading-color: #f3f0ea;
@@ -47,17 +51,48 @@ html {
 }
 
 body {
+    position: relative;
+    overflow-x: hidden;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif,
         "Hiragino Kaku Gothic ProN", "Hiragino Sans";
     font-size: calc(17px * var(--text-scale));
     line-height: 1.74;
     color: var(--text-color);
     background-color: var(--bg-color);
-    max-width: 46rem;
+    max-width: calc(46rem + var(--document-line-number-gutter-width));
     margin: 0 auto;
-    padding: 44px 28px 72px;
+    padding: 44px 28px 72px calc(28px + var(--document-line-number-gutter-width));
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
+}
+
+#document-line-number-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    user-select: none;
+}
+
+#document-line-number-column {
+    position: absolute;
+    top: 44px;
+    left: 28px;
+    width: var(--document-line-number-gutter-width);
+}
+
+.document-line-number {
+    position: absolute;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 0.75rem;
+    font-size: 0.72em;
+    line-height: 1;
+    color: var(--muted-color);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    opacity: 0.78;
 }
 
 h1,
@@ -142,6 +177,54 @@ pre {
 
 pre code {
     font-size: 0.82em;
+}
+
+.stillmd-code-block {
+    display: grid;
+    grid-template-columns: var(--code-line-number-width) minmax(0, 1fr);
+    column-gap: 0.85rem;
+    background-color: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-radius: 13px;
+    padding: 18px 20px;
+    overflow-x: auto;
+    line-height: 1.62;
+    margin-top: 1.05em;
+    margin-bottom: 1.05em;
+}
+
+.stillmd-code-gutter {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0;
+    font-family: "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.76em;
+    line-height: 1.62;
+    color: var(--muted-color);
+    user-select: none;
+    font-variant-numeric: tabular-nums;
+}
+
+.stillmd-code-line-number {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    height: 1.62em;
+}
+
+.stillmd-code-lines {
+    min-width: 0;
+}
+
+.stillmd-code-line {
+    height: 1.62em;
+    white-space: pre;
+}
+
+.stillmd-code-line-content {
+    display: block;
+    white-space: pre;
 }
 
 blockquote {

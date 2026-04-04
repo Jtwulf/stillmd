@@ -7,6 +7,7 @@ struct MarkdownWebView: NSViewRepresentable {
     @Binding var scrollPosition: CGFloat
     let themePreference: ThemePreference
     let textScale: Double
+    let documentLineNumbersVisible: Bool
     let findQuery: String
     let findRequest: FindRequest?
     @Binding var findStatus: FindStatus
@@ -31,13 +32,15 @@ struct MarkdownWebView: NSViewRepresentable {
             css: ResourceLoader.loadCSS(),
             initialScrollPosition: Double(scrollPosition),
             themePreference: themePreference.rawValue,
-            textScale: textScale
+            textScale: textScale,
+            documentLineNumbersVisible: documentLineNumbersVisible
         )
         webView.loadHTMLString(html, baseURL: baseURL)
 
         context.coordinator.lastContent = markdownContent
         context.coordinator.lastThemePreference = themePreference.rawValue
         context.coordinator.lastTextScale = textScale
+        context.coordinator.lastDocumentLineNumbersVisible = documentLineNumbersVisible
         context.coordinator.lastFindQuery = findQuery
 
         return webView
@@ -78,6 +81,14 @@ struct MarkdownWebView: NSViewRepresentable {
             evaluateJavaScript("setTextScale(\(clampedTextScale));", in: webView)
         }
 
+        if context.coordinator.lastDocumentLineNumbersVisible != documentLineNumbersVisible {
+            context.coordinator.lastDocumentLineNumbersVisible = documentLineNumbersVisible
+            evaluateJavaScript(
+                "setDocumentLineNumbersVisible(\(documentLineNumbersVisible));",
+                in: webView
+            )
+        }
+
         if context.coordinator.lastFindQuery != findQuery {
             context.coordinator.lastFindQuery = findQuery
             evaluateJavaScript(
@@ -116,6 +127,7 @@ struct MarkdownWebView: NSViewRepresentable {
         var lastContent: String = ""
         var lastThemePreference: String = ThemePreference.system.rawValue
         var lastTextScale: Double = AppPreferences.defaultTextScale
+        var lastDocumentLineNumbersVisible: Bool = false
         var lastFindQuery: String = ""
         var lastFindRequestID: Int?
 
