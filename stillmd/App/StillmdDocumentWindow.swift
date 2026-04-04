@@ -53,7 +53,10 @@ final class StillmdDocumentWindow: NSWindow, NSWindowDelegate {
         )
         .environment(\.documentChromeController, chromeController)
 
-        contentView = NSHostingView(rootView: rootView)
+        let hostingView = NSHostingView(rootView: rootView)
+        hostingView.frame = NSRect(origin: .zero, size: rect.size)
+        hostingView.autoresizingMask = [.width, .height]
+        contentView = hostingView
         center()
         makeKeyAndOrderFront(nil)
     }
