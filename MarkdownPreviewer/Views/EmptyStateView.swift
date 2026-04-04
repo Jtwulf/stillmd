@@ -35,7 +35,7 @@ struct EmptyStateView: View {
         .padding(.horizontal, 32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .opacity(revealOpacity)
-        .offset(y: -28 + revealOffset)
+        .offset(y: -12 + revealOffset)
         .animation(
             StillmdMotion.animation(for: StillmdMotion.emptyReveal, reduceMotion: reduceMotion),
             value: isPresented

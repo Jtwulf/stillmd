@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import AppKit
 @testable import MarkdownPreviewer
 
 // MARK: - Task 2.2: Property Test — File Extension Validation (Property 1)
@@ -1255,6 +1256,50 @@ struct WindowManagerUnitTests {
         #expect(wm.openFiles.contains(resolved2),
                 "Equivalent paths should be deduplicated via standardizedFileURL")
         #expect(wm.openFiles.count == 1)
+    }
+
+    @Test("Duplicate open triggers bring-to-front instead of opening a new window")
+    @MainActor
+    func duplicateOpenTriggersBringToFront() {
+        let wm = WindowManager()
+        wm._testOpenWindowHandler = { _ in }
+        var broughtToFront: [URL] = []
+        let url = URL(fileURLWithPath: "/tmp/test-file.md")
+
+        wm._testBringToFrontHandler = { broughtToFront.append($0) }
+
+        wm.openFile(url)
+        wm.openFile(url)
+
+        #expect(broughtToFront == [url.standardizedFileURL])
+        #expect(wm.openFiles.count == 1)
+    }
+
+    @Test("registerWindow tracks a live NSWindow for the file URL")
+    @MainActor
+    func registerWindowTracksWindow() {
+        let wm = WindowManager()
+        let window = NSWindow()
+        let url = URL(fileURLWithPath: "/tmp/test-file.md")
+
+        wm.registerWindow(window, for: url)
+
+        #expect(wm._registeredWindowCount == 1)
+    }
+
+    @Test("closeFile clears any registered window for the file URL")
+    @MainActor
+    func closeFileClearsRegisteredWindow() {
+        let wm = WindowManager()
+        let window = NSWindow()
+        let url = URL(fileURLWithPath: "/tmp/test-file.md")
+
+        wm.registerWindow(window, for: url)
+        wm.registerFile(url)
+        wm.closeFile(url)
+
+        #expect(wm._registeredWindowCount == 0)
+        #expect(wm.openFiles.isEmpty)
     }
 }
 

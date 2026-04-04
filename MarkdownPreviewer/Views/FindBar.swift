@@ -31,6 +31,7 @@ struct FindBar: View {
     let onNext: () -> Void
     let onClose: () -> Void
 
+    @Environment(\.colorScheme) private var colorScheme
     @FocusState private var isFieldFocused: Bool
 
     var body: some View {
@@ -71,14 +72,14 @@ struct FindBar: View {
         }
         .font(.system(size: 12))
         .padding(.horizontal, 10)
-        .padding(.vertical, 7)
+        .padding(.vertical, 6)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color(nsColor: .windowBackgroundColor))
+                .fill(WindowSurfacePalette.background(for: colorScheme))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
         )
         .onAppear {
             isFieldFocused = true

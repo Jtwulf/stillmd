@@ -5,12 +5,50 @@ struct RootView: View {
     @ObservedObject var windowManager: WindowManager
     @ObservedObject var pendingFileOpenCoordinator: PendingFileOpenCoordinator
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(AppPreferences.themeKey) private var themePreferenceRawValue =
+        ThemePreference.system.rawValue
 
     @State private var isEmptyStatePresented = false
     @State private var isDropTargeted = false
 
+    private var themePreference: ThemePreference {
+        ThemePreference(rawValue: themePreferenceRawValue) ?? .system
+    }
+
+    private var resolvedColorScheme: ColorScheme {
+        themePreference.colorScheme ?? colorScheme
+    }
+
+    private var windowTitle: String {
+        fileURL?.lastPathComponent ?? "stillmd"
+    }
+
     var body: some View {
-        rootContent
+        ZStack {
+            WindowSurfacePalette.background(for: resolvedColorScheme)
+                .ignoresSafeArea()
+
+            rootContent
+        }
+        .overlay(alignment: .top) {
+            Text(windowTitle)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .padding(.top, 8)
+                .padding(.horizontal, 120)
+                .allowsHitTesting(false)
+        }
+        .background(
+            WindowAccessor(
+                fileURL: fileURL?.standardizedFileURL,
+                title: windowTitle,
+                colorScheme: resolvedColorScheme,
+                windowManager: windowManager
+            )
+        )
         .onAppear {
             windowManager.openWindowAction = openWindow
 
@@ -34,7 +72,7 @@ struct RootView: View {
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
             handleDrop(providers)
         }
-        .navigationTitle(fileURL?.lastPathComponent ?? "stillmd")
+        .navigationTitle(windowTitle)
     }
 
     @ViewBuilder
