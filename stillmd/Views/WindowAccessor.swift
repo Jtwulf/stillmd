@@ -203,6 +203,8 @@ struct WindowAccessor: NSViewRepresentable {
         private var lifecycleReapply: (() -> Void)?
         private var documentTitleAccessory: StillmdDocumentTitleAccessoryController?
         private weak var accessoryWindow: NSWindow?
+        /// Coalesces `didMove` bursts while dragging; immediate notifications use `lifecycleReapply` directly.
+        private var geometryReapplyWorkItem: DispatchWorkItem?
 
         deinit {
             notificationObservers.removeAll()
@@ -211,6 +213,7 @@ struct WindowAccessor: NSViewRepresentable {
         func teardown() {
             // Invalidate any in-flight delayed reapply work from `updateWindow`.
             configurationSequence += 1
+            cancelGeometryReapplyWorkItem()
             removeWindowLifecycleObservers()
             if let accessory = documentTitleAccessory, let window = accessoryWindow,
                 let index = window.titlebarAccessoryViewControllers.firstIndex(where: { $0 === accessory })
@@ -232,14 +235,16 @@ struct WindowAccessor: NSViewRepresentable {
             lifecycleReapply = reapply
 
             let center = NotificationCenter.default
-            let names: [Notification.Name] = [
+            let immediateNames: [Notification.Name] = [
                 NSWindow.didBecomeKeyNotification,
                 NSWindow.didResignKeyNotification,
                 NSWindow.didBecomeMainNotification,
                 NSWindow.didResignMainNotification,
+                NSWindow.didChangeScreenNotification,
+                NSWindow.didChangeBackingPropertiesNotification,
             ]
 
-            for name in names {
+            for name in immediateNames {
                 let token = center.addObserver(
                     forName: name,
                     object: window,
@@ -251,9 +256,37 @@ struct WindowAccessor: NSViewRepresentable {
                 }
                 notificationObservers.append(token)
             }
+
+            let moveToken = center.addObserver(
+                forName: NSWindow.didMoveNotification,
+                object: window,
+                queue: .main
+            ) { [weak self] _ in
+                DispatchQueue.main.async {
+                    self?.scheduleDebouncedGeometryReapply()
+                }
+            }
+            notificationObservers.append(moveToken)
+        }
+
+        private func scheduleDebouncedGeometryReapply() {
+            geometryReapplyWorkItem?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                geometryReapplyWorkItem = nil
+                lifecycleReapply?()
+            }
+            geometryReapplyWorkItem = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08, execute: work)
+        }
+
+        private func cancelGeometryReapplyWorkItem() {
+            geometryReapplyWorkItem?.cancel()
+            geometryReapplyWorkItem = nil
         }
 
         private func removeWindowLifecycleObservers() {
+            cancelGeometryReapplyWorkItem()
             notificationObservers.removeAll()
             observedWindow = nil
             lifecycleReapply = nil
