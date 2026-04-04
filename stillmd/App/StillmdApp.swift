@@ -12,7 +12,6 @@ enum WindowDefaults {
 struct StillmdApp: App {
 
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @StateObject private var windowManager = WindowManager()
     @AppStorage(AppPreferences.themeKey) private var themePreferenceRawValue =
         ThemePreference.system.rawValue
 
@@ -21,50 +20,57 @@ struct StillmdApp: App {
     }
 
     var body: some Scene {
-        WindowGroup(for: URL.self) { $url in
-            RootView(
-                fileURL: $url,
-                windowManager: windowManager,
-                pendingFileOpenCoordinator: appDelegate.pendingFileOpenCoordinator
-            )
+        Settings {
+            SettingsView()
                 .preferredColorScheme(themePreference.colorScheme)
-                .frame(
-                    minWidth: WindowDefaults.minimumWidth,
-                    minHeight: WindowDefaults.minimumHeight
-                )
-                .background(
-                    LaunchWindowSizer(
-                        width: WindowDefaults.defaultWidth,
-                        height: WindowDefaults.defaultHeight
-                    )
-                )
         }
         .commands {
             FindCommands()
             CommandGroup(replacing: .newItem) {
                 Button("Open…") {
-                    windowManager.showOpenPanel()
+                    appDelegate.windowManager.showOpenPanel()
                 }
                 .keyboardShortcut("o", modifiers: .command)
             }
         }
-        .restorationBehavior(.disabled)
-        .defaultSize(
-            width: WindowDefaults.defaultWidth,
-            height: WindowDefaults.defaultHeight
-        )
-
-        Settings {
-            SettingsView()
-                .preferredColorScheme(themePreference.colorScheme)
-        }
     }
 }
 
-/// Handles Finder "Open With" / file double-click events.
+/// Handles Finder "Open With" / file double-click events and document window bootstrap.
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     let pendingFileOpenCoordinator = PendingFileOpenCoordinator()
+    let windowManager = WindowManager()
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.regular)
+
+        windowManager.openNewDocumentHandler = { [weak self] url in
+            guard let self else { return }
+            DocumentWindowFactory.openDocument(
+                initialURL: url,
+                windowManager: self.windowManager,
+                pendingCoordinator: self.pendingFileOpenCoordinator
+            )
+        }
+
+        DocumentWindowFactory.openDocument(
+            windowManager: windowManager,
+            pendingCoordinator: pendingFileOpenCoordinator
+        )
+
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag {
+            DocumentWindowFactory.openDocument(
+                windowManager: windowManager,
+                pendingCoordinator: pendingFileOpenCoordinator
+            )
+        }
+        return true
+    }
 
     func application(_ application: NSApplication, open urls: [URL]) {
         let mdURLs = urls.filter { FileValidation.isMarkdownFile($0) }

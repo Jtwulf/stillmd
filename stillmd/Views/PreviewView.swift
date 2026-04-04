@@ -41,7 +41,7 @@ struct PreviewView: View {
             .safeAreaInset(edge: .top, spacing: 0) {
                 topChrome
             }
-        // Title is shown via `WindowAccessor` (titlebar accessory); avoid `.navigationTitle` fighting AppKit chrome.
+        // Title is shown via `DocumentWindowChromeController` (titlebar accessory); avoid `.navigationTitle` fighting AppKit chrome.
         .onAppear {
             // Register this file in WindowManager for duplicate detection,
             // regardless of how the window was created (Finder, Dock, NSWorkspace, etc.)
