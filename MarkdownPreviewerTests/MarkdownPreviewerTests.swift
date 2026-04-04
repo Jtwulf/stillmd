@@ -83,6 +83,36 @@ struct FileExtensionValidationPropertyTests {
     }
 }
 
+@Suite("PendingFileOpenCoordinator Unit Tests")
+@MainActor
+struct PendingFileOpenCoordinatorUnitTests {
+
+    @Test("enqueue stores URLs and increments the change id")
+    func enqueueStoresURLs() {
+        let coordinator = PendingFileOpenCoordinator()
+        let urls = [
+            URL(fileURLWithPath: "/tmp/README.md"),
+            URL(fileURLWithPath: "/tmp/NOTES.markdown"),
+        ]
+
+        coordinator.enqueue(urls)
+
+        #expect(coordinator.pendingChangeID == 1)
+        #expect(coordinator.drain() == urls)
+        #expect(coordinator.drain().isEmpty)
+    }
+
+    @Test("empty enqueue does not publish a new change")
+    func emptyEnqueueDoesNothing() {
+        let coordinator = PendingFileOpenCoordinator()
+
+        coordinator.enqueue([])
+
+        #expect(coordinator.pendingChangeID == 0)
+        #expect(coordinator.drain().isEmpty)
+    }
+}
+
 
 // MARK: - Task 2.3: Property Test — GFM Conversion Produces Non-Empty HTML (Property 4)
 // **Validates: Requirements 4.1**

@@ -3,82 +3,86 @@ import SwiftUI
 struct RootView: View {
     @Binding var fileURL: URL?
     @ObservedObject var windowManager: WindowManager
+    @ObservedObject var pendingFileOpenCoordinator: PendingFileOpenCoordinator
     @Environment(\.openWindow) private var openWindow
 
     @State private var isReady = false
-    @State private var waitingForPendingURL = true
+    @State private var isDropTargeted = false
 
     var body: some View {
         Group {
             if let url = fileURL {
                 PreviewView(fileURL: url, windowManager: windowManager)
-            } else if !waitingForPendingURL {
-                EmptyStateView {
-                    openFileInCurrentWindow()
-                }
             } else {
-                Color.clear
+                EmptyStateView(
+                    onOpen: {
+                        openFileInCurrentWindow()
+                    },
+                    isDropTargeted: isDropTargeted
+                )
             }
         }
         .opacity(isReady ? 1 : 0)
-        .animation(.easeIn(duration: 0.15), value: isReady)
+        .animation(.easeOut(duration: 0.16), value: isReady)
         .onAppear {
             windowManager.openWindowAction = openWindow
 
             if fileURL != nil {
-                waitingForPendingURL = false
                 isReady = true
                 return
             }
 
-            consumePendingURLs()
-
-            if fileURL != nil {
-                waitingForPendingURL = false
+            if consumePendingURLs() {
                 isReady = true
                 return
             }
 
-            // Poll for pending URLs from AppDelegate (cold start timing)
-            startPendingURLPolling()
+            revealEmptyStateIfNeeded()
         }
-        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+        .onChange(of: pendingFileOpenCoordinator.pendingChangeID) { _, _ in
+            if consumePendingURLs(), !isReady {
+                isReady = true
+            }
+        }
+        .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
             handleDrop(providers)
         }
         .navigationTitle(fileURL?.lastPathComponent ?? "stillmd")
     }
 
-    private func startPendingURLPolling() {
+    private func revealEmptyStateIfNeeded() {
         Task { @MainActor in
-            for _ in 0..<20 { // up to 1 second
-                try? await Task.sleep(for: .milliseconds(50))
-                consumePendingURLs()
-                if fileURL != nil {
-                    waitingForPendingURL = false
-                    withAnimation(.easeIn(duration: 0.15)) {
-                        isReady = true
-                    }
-                    return
-                }
-            }
-            // No pending URL arrived — show EmptyStateView
-            waitingForPendingURL = false
-            withAnimation(.easeIn(duration: 0.15)) {
+            await Task.yield()
+
+            if consumePendingURLs() {
                 isReady = true
+                return
+            }
+
+            if !isReady {
+                withAnimation(.easeOut(duration: 0.16)) {
+                    isReady = true
+                }
             }
         }
     }
 
-    private func consumePendingURLs() {
-        guard !AppDelegate.pendingURLs.isEmpty else { return }
+    @discardableResult
+    private func consumePendingURLs() -> Bool {
+        let pendingURLs = pendingFileOpenCoordinator.drain()
+        guard !pendingURLs.isEmpty else { return false }
 
-        if fileURL == nil {
-            fileURL = AppDelegate.pendingURLs.removeFirst()
+        var remainingURLs = pendingURLs
+        if fileURL == nil, let initialURL = remainingURLs.first {
+            fileURL = initialURL
+            remainingURLs.removeFirst()
         }
-        for url in AppDelegate.pendingURLs {
-            openWindow(value: url)
+
+        for url in remainingURLs {
+            windowManager.openFile(url)
         }
-        AppDelegate.pendingURLs.removeAll()
+
+        return true
     }
 
     private func openFileInCurrentWindow() {
@@ -86,6 +90,9 @@ struct RootView: View {
         FileValidation.configureOpenPanel(panel, allowsMultipleSelection: false)
         if panel.runModal() == .OK, let url = panel.url {
             fileURL = url
+            if !isReady {
+                isReady = true
+            }
         }
     }
 
@@ -103,35 +110,5 @@ struct RootView: View {
             }
         }
         return true
-    }
-}
-
-struct EmptyStateView: View {
-    let onOpen: () -> Void
-
-    var body: some View {
-        VStack(spacing: 18) {
-            Image(systemName: "doc.text.magnifyingglass")
-                .font(.system(size: 52, weight: .light))
-                .foregroundColor(.secondary)
-            VStack(spacing: 6) {
-                Text("Markdown を静かに読む")
-                    .font(.title3.weight(.semibold))
-                Text("ファイルをドロップするか、開くを選んでください。")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-            }
-            Button("ファイルを開く…") {
-                onOpen()
-            }
-            .buttonStyle(.bordered)
-            .keyboardShortcut("o", modifiers: .command)
-            Text("⌘O でも開けます")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-        }
-        .frame(maxWidth: 360)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(40)
     }
 }
