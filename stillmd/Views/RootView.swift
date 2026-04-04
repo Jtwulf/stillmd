@@ -31,6 +31,7 @@ struct RootView: View {
 
             rootContent
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .preferredColorScheme(themePreference.colorScheme)
         .onAppear {
             if documentSession.fileURL != nil {

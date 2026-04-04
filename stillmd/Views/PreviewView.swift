@@ -38,11 +38,14 @@ struct PreviewView: View {
     }
 
     var body: some View {
-        corePreview
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .safeAreaInset(edge: .top, spacing: 0) {
-                topChrome
-            }
+        // Use a plain `VStack` instead of `safeAreaInset`: inside `NSHostingView` + fullSizeContentView,
+        // top safe-area math can collapse the web content to zero height (blank white preview).
+        VStack(spacing: 0) {
+            topChrome
+            corePreview
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         // Title is shown via `DocumentWindowChromeController` (titlebar accessory); avoid `.navigationTitle` fighting AppKit chrome.
         .onAppear {
             // Register this file in WindowManager for duplicate detection,
