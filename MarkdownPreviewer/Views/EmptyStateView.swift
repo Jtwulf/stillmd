@@ -8,6 +8,10 @@ struct EmptyStateView: View {
 
     var body: some View {
         VStack(spacing: 14) {
+            Image(systemName: "doc.text")
+                .font(.system(size: 48, weight: .light))
+                .foregroundStyle(.secondary)
+
             Text("Open Markdown")
                 .font(.title3.weight(.medium))
                 .foregroundStyle(isDropTargeted ? .primary : .secondary)
