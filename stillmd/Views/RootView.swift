@@ -62,7 +62,8 @@ struct RootView: View {
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
             handleDrop(providers)
         }
-        .navigationTitle(windowTitle)
+        // Window title + chrome are driven by `WindowAccessor` on `NSWindow`.
+        // Avoid `.navigationTitle` here: it syncs with AppKit titlebar and can undo unified chrome.
     }
 
     @ViewBuilder

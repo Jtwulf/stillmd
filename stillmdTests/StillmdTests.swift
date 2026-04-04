@@ -838,7 +838,7 @@ struct FileModificationContentUpdatePropertyTests {
 struct WindowTitleMatchesFileNamePropertyTests {
 
     /// For any file URL, fileURL.lastPathComponent produces the expected filename.
-    /// This validates the logic used in PreviewView's .navigationTitle(fileURL.lastPathComponent).
+    /// This matches the window title string used by `WindowAccessor` / titlebar accessory.
     /// Generates 120 random file URLs with various filenames.
     @Test("Window title matches file name for 120 random file URLs")
     func windowTitleMatchesFileName() {
@@ -872,7 +872,6 @@ struct WindowTitleMatchesFileNamePropertyTests {
                 .replacingOccurrences(of: "//", with: "/")
             let fileURL = URL(fileURLWithPath: filePath)
 
-            // This is the exact logic used in PreviewView: .navigationTitle(fileURL.lastPathComponent)
             let actualTitle = fileURL.lastPathComponent
 
             #expect(actualTitle == expectedTitle,
