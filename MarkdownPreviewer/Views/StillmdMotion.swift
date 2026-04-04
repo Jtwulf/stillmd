@@ -31,9 +31,17 @@ enum StillmdMotion {
     }
 }
 
-private struct OffsetOpacityModifier: ViewModifier {
-    let opacity: Double
-    let offsetY: CGFloat
+private struct OffsetOpacityModifier: ViewModifier, @preconcurrency Animatable {
+    var opacity: Double
+    var offsetY: CGFloat
+
+    var animatableData: AnimatablePair<Double, CGFloat> {
+        get { AnimatablePair(opacity, offsetY) }
+        set {
+            opacity = newValue.first
+            offsetY = newValue.second
+        }
+    }
 
     func body(content: Content) -> some View {
         content

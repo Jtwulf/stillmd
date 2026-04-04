@@ -14,6 +14,7 @@ struct PreviewView: View {
     @State private var findStatus = FindStatus.empty
     @State private var findRequest: FindRequest?
     @State private var findRequestID = 0
+    @State private var isFindBarChromeReserved = false
     @State private var pendingFindResetTask: Task<Void, Never>?
 
     init(fileURL: URL, windowManager: WindowManager) {
@@ -32,7 +33,7 @@ struct PreviewView: View {
 
     /// エラー帯または検索バー表示中のみインセット内に実コンテンツを置く（非表示時は高さ 0 でプレースホルダ）。
     private var shouldShowTopChrome: Bool {
-        isFindBarPresented || (viewModel.errorMessage != nil && shouldKeepPreviewVisible)
+        isFindBarChromeReserved || (viewModel.errorMessage != nil && shouldKeepPreviewVisible)
     }
 
     var body: some View {
@@ -134,13 +135,16 @@ struct PreviewView: View {
     }
 
     private func presentFindBar() {
+        guard !isFindBarPresented else { return }
         pendingFindResetTask?.cancel()
         runAnimation(StillmdMotion.animation(for: StillmdMotion.findBarInsertion, reduceMotion: reduceMotion)) {
+            isFindBarChromeReserved = true
             isFindBarPresented = true
         }
     }
 
     private func dismissFindBar() {
+        guard isFindBarPresented else { return }
         pendingFindResetTask?.cancel()
         runAnimation(StillmdMotion.animation(for: StillmdMotion.findBarRemoval, reduceMotion: reduceMotion)) {
             isFindBarPresented = false
@@ -163,6 +167,7 @@ struct PreviewView: View {
 
         guard !reduceMotion else {
             reset()
+            isFindBarChromeReserved = false
             return
         }
 
@@ -173,6 +178,9 @@ struct PreviewView: View {
 
             guard !Task.isCancelled, !isFindBarPresented else { return }
             reset()
+            runAnimation(StillmdMotion.animation(for: StillmdMotion.findBarRemoval, reduceMotion: reduceMotion)) {
+                isFindBarChromeReserved = false
+            }
         }
     }
 
