@@ -88,17 +88,12 @@ struct WindowAccessor: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         context.coordinator.hostView = view
-        Task { @MainActor in
-            updateWindow(from: view, coordinator: context.coordinator)
-        }
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
         context.coordinator.hostView = nsView
-        Task { @MainActor in
-            updateWindow(from: nsView, coordinator: context.coordinator)
-        }
+        updateWindow(from: nsView, coordinator: context.coordinator)
     }
 
     static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
@@ -245,7 +240,7 @@ struct WindowAccessor: NSViewRepresentable {
                     object: window,
                     queue: .main
                 ) { [weak self] _ in
-                    Task { @MainActor in
+                    MainActor.assumeIsolated {
                         self?.lifecycleReapply?()
                     }
                 }
