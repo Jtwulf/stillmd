@@ -1,15 +1,16 @@
 import SwiftUI
 
 struct FileCommands: Commands {
-    @Environment(\.openWindow) private var openWindow
-
-    let blankWindowID: String
     let windowManager: WindowManager
+    let pendingCoordinator: PendingFileOpenCoordinator
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
             Button("New Window") {
-                openWindow(id: blankWindowID)
+                DocumentWindowFactory.openDocument(
+                    windowManager: windowManager,
+                    pendingCoordinator: pendingCoordinator
+                )
             }
             .keyboardShortcut("n", modifiers: .command)
 

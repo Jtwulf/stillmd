@@ -39,6 +39,7 @@ struct PreviewView: View {
 
     var body: some View {
         corePreview
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .safeAreaInset(edge: .top, spacing: 0) {
                 topChrome
             }
@@ -69,7 +70,7 @@ struct PreviewView: View {
             }
             triggerFind(.next)
         }))
-        .focusedValue(\.findPreviousAction, FindAction(perform: {
+        .focusedSceneValue(\.findPreviousAction, FindAction(perform: {
             if !isFindBarPresented {
                 presentFindBar()
                 return
