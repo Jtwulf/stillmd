@@ -463,6 +463,14 @@ struct HTMLTemplateUnitTests {
         #expect(html.contains("scheduleDocumentLineNumberLayout"))
     }
 
+    @Test("Document line number layout aligns rows to column and uses one box per code line")
+    func documentLineNumberLayoutUsesColumnGeometry() {
+        let html = buildHTML(from: "test")
+        #expect(html.contains("documentLineNumberOverlay.getBoundingClientRect"))
+        #expect(html.contains("classList.contains('stillmd-code-line')"))
+        #expect(html.contains("rowRects"))
+    }
+
     @Test("Contains default code block line number decorator")
     func containsDefaultCodeBlockLineNumbers() {
         let html = buildHTML(from: "```swift\nlet x = 1\n```")
