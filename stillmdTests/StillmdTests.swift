@@ -3,6 +3,23 @@ import Foundation
 import AppKit
 @testable import stillmd
 
+private enum StillmdHTMLTestHelpers {
+    /// Decodes markdown from `stillmdMarkdownFromBase64('…')` in `HTMLTemplate` output.
+    static func embeddedMarkdownPayload(from html: String) -> String? {
+        let needle = "stillmdMarkdownFromBase64('"
+        guard let range = html.range(of: needle) else { return nil }
+        var idx = range.upperBound
+        var b64Chars: [Character] = []
+        while idx < html.endIndex, html[idx] != "'" {
+            b64Chars.append(html[idx])
+            idx = html.index(after: idx)
+        }
+        let b64 = String(b64Chars)
+        guard let data = Data(base64Encoded: b64) else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+}
+
 // MARK: - Task 2.2: Property Test — File Extension Validation (Property 1)
 // **Validates: Requirements 2.4**
 
@@ -228,7 +245,7 @@ struct HTMLTemplateUnitTests {
     func containsEscapedContent() {
         let markdown = "Hello **world**"
         let html = buildHTML(from: markdown)
-        #expect(html.contains("Hello **world**"))
+        #expect(StillmdHTMLTestHelpers.embeddedMarkdownPayload(from: html) == markdown)
     }
 
     // --- Code Block Rendering ---
@@ -284,25 +301,21 @@ struct HTMLTemplateUnitTests {
     func escapesBackticks() {
         let markdown = "Use `code` and ```block```"
         let html = buildHTML(from: markdown)
-        // Backticks should be escaped as \` in the JS template literal
-        #expect(html.contains("\\`code\\`"))
-        #expect(html.contains("\\`\\`\\`block\\`\\`\\`"))
+        #expect(StillmdHTMLTestHelpers.embeddedMarkdownPayload(from: html) == markdown)
     }
 
     @Test("Properly escapes backslashes in Markdown content")
     func escapesBackslashes() {
         let markdown = "path\\to\\file"
         let html = buildHTML(from: markdown)
-        // Backslashes should be doubled: \ → \\
-        #expect(html.contains("path\\\\to\\\\file"))
+        #expect(StillmdHTMLTestHelpers.embeddedMarkdownPayload(from: html) == markdown)
     }
 
     @Test("Properly escapes dollar signs in Markdown content")
     func escapesDollarSigns() {
         let markdown = "Price is $100"
         let html = buildHTML(from: markdown)
-        // Dollar signs should be escaped as \$
-        #expect(html.contains("Price is \\$100"))
+        #expect(StillmdHTMLTestHelpers.embeddedMarkdownPayload(from: html) == markdown)
     }
 
     // --- HTML Document Structure ---
@@ -1556,10 +1569,9 @@ struct AutolinksPropertyTests {
 
             let html = buildHTML(from: markdown)
 
-            // The URL should be present in the HTML template (escaped for JS template literal)
-            // The escaping only affects \, `, and $ — none of which appear in standard URLs
-            #expect(html.contains(url),
-                    "HTML template should contain the URL '\(url)' (iteration \(i))")
+            let embedded = StillmdHTMLTestHelpers.embeddedMarkdownPayload(from: html)
+            #expect(embedded?.contains(url) == true,
+                    "Embedded markdown should contain the URL '\(url)' (iteration \(i))")
 
             // Verify the template has the expected structure for rendering
             #expect(html.contains("marked.setOptions"),
@@ -1579,10 +1591,11 @@ struct AutolinksPropertyTests {
         ]
         let markdown = "Visit \(urls[0]) and \(urls[1]) and \(urls[2]) for info."
         let html = buildHTML(from: markdown)
+        let embedded = StillmdHTMLTestHelpers.embeddedMarkdownPayload(from: html) ?? ""
 
         for url in urls {
-            #expect(html.contains(url),
-                    "HTML template should contain URL: \(url)")
+            #expect(embedded.contains(url),
+                    "Embedded markdown should contain URL: \(url)")
         }
     }
 
@@ -1593,7 +1606,7 @@ struct AutolinksPropertyTests {
         let url = "https://example.com/search/page"
         let markdown = "Go to \(url) for results."
         let html = buildHTML(from: markdown)
-        #expect(html.contains(url))
+        #expect(StillmdHTMLTestHelpers.embeddedMarkdownPayload(from: html)?.contains(url) == true)
     }
 }
 
@@ -1655,11 +1668,10 @@ struct CodeBlockHighlightingPropertyTests {
             let markdown = "```\(lang)\n\(code)\n```"
 
             let html = buildHTML(from: markdown)
+            let embedded = StillmdHTMLTestHelpers.embeddedMarkdownPayload(from: html) ?? ""
 
-            // The code content should be present in the template
-            // (backticks get escaped to \` in the JS template literal)
-            #expect(html.contains("\\`\\`\\`\(lang)"),
-                    "HTML template should contain the escaped fenced code block opening with language '\(lang)' (iteration \(i))")
+            #expect(embedded.contains("```\(lang)"),
+                    "Embedded markdown should contain the fenced code block opening with language '\(lang)' (iteration \(i))")
 
             // Verify highlight.js integration is configured in the template
             #expect(html.contains("hljs.highlight"),
@@ -1692,8 +1704,8 @@ struct CodeBlockHighlightingPropertyTests {
     func codeBlockWithoutLanguage() {
         let markdown = "```\nplain code\n```"
         let html = buildHTML(from: markdown)
-        #expect(html.contains("plain code"),
-                "Template should contain the code content even without language")
+        #expect(StillmdHTMLTestHelpers.embeddedMarkdownPayload(from: html)?.contains("plain code") == true,
+                "Embedded markdown should contain the code content even without language")
     }
 }
 

@@ -11,11 +11,9 @@ enum HTMLTemplate {
         textScale: Double = AppPreferences.defaultTextScale,
         documentLineNumbersVisible: Bool = false
     ) -> String {
-        let escapedMarkdown = markdownContent
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "`", with: "\\`")
-            .replacingOccurrences(of: "$", with: "\\$")
-            .replacingOccurrences(of: "</script>", with: "<\\/script>")
+        // Base64 keeps `${…}`, backticks, quotes, and `</script>` from breaking out of the HTML `<script>` block
+        // or being interpreted as JS (template literals / unterminated strings → blank WebView).
+        let markdownBase64 = Data(markdownContent.utf8).base64EncodedString()
         let escapedThemePreference = themePreference
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
@@ -26,7 +24,6 @@ enum HTMLTemplate {
         <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src file: data: https: http:;">
             <style>\(css)</style>
             <script>\(markedJS)</script>
             <script>\(highlightJS)</script>
@@ -61,8 +58,17 @@ enum HTMLTemplate {
                     }
                 });
 
-                // Initial render
-                const md = `\(escapedMarkdown)`;
+                function stillmdMarkdownFromBase64(b64) {
+                    const binary = atob(b64);
+                    const bytes = new Uint8Array(binary.length);
+                    for (let i = 0; i < binary.length; i++) {
+                        bytes[i] = binary.charCodeAt(i);
+                    }
+                    return new TextDecoder('utf-8').decode(bytes);
+                }
+
+                // Initial render (see Swift: markdownBase64)
+                const md = stillmdMarkdownFromBase64('\(markdownBase64)');
                 const contentElement = document.getElementById('content');
                 const documentLineNumberOverlay = document.getElementById('document-line-number-overlay');
                 const documentLineNumberColumn = document.getElementById('document-line-number-column');
