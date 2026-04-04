@@ -1,23 +1,31 @@
 import AppKit
 import SwiftUI
 
+/// Thread-safe via `NSLock`. Marked `@unchecked Sendable` so `Coordinator.deinit` can drop observers safely.
 private final class NotificationTokenBag: @unchecked Sendable {
+    private let lock = NSLock()
     private var tokens: [NSObjectProtocol] = []
 
     func append(_ token: NSObjectProtocol) {
+        lock.lock()
         tokens.append(token)
+        lock.unlock()
     }
 
     func removeAll() {
+        lock.lock()
         let snapshot = tokens
         tokens.removeAll()
+        lock.unlock()
         for token in snapshot {
             NotificationCenter.default.removeObserver(token)
         }
     }
 
     var isEmpty: Bool {
-        tokens.isEmpty
+        lock.lock()
+        defer { lock.unlock() }
+        return tokens.isEmpty
     }
 }
 
