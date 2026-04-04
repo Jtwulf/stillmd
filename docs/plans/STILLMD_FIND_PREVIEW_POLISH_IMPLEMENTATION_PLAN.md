@@ -43,7 +43,7 @@
 
 `PreviewView` のインセット内は概ね次の構造である（`main` 同等）:
 
-```50:71:MarkdownPreviewer/Views/PreviewView.swift
+```50:71:stillmd/Views/PreviewView.swift
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 8) {
                 if let error = viewModel.errorMessage, shouldKeepPreviewVisible {
@@ -144,13 +144,13 @@
 - [x] `:root` と `[data-theme="dark"]` の `--find-match-bg` / `--find-match-active-bg` を更新する
 - [x] 見出し・本文・コードブロック内の **通常マッチと current** が区別できることを確認する（セルフレビュー、実機スモーク推奨）
 - [x] 長文連続マッチ・ダークテーマで **眩しすぎない**ことを確認する（実機スモーク推奨）
-- [x] `MarkdownPreviewerTests` 内で HTML/CSS に依存するテストがあれば、**期待文字列**を更新する（例: `find-match` 関連の固定文字列があれば）（変更不要で通過を確認）
+- [x] `stillmdTests` 内で HTML/CSS に依存するテストがあれば、**期待文字列**を更新する（例: `find-match` 関連の固定文字列があれば）（変更不要で通過を確認）
 - [x] `swift test` が通る
 
 ### Phase 4: 回帰・仕上げ
 
 - [x] スクロール位置保持（ファイル再読み込み・テーマ変更・文字サイズ変更）にデグレがないことを手動確認する（既存テスト + コードレビュー、実機スモーク推奨）
-- [x] Settings（`main` では `MarkdownPreviewerApp` に `Settings` シーンあり）と競合しないことを確認する
+- [x] Settings（`main` では `StillmdApp` に `Settings` シーンあり）と競合しないことを確認する
 - [x] `DESIGN.md` / `02-ui-implementation.md` に反する見た目（常設バー化・過剰装飾）でないことをセルフレビューする
 - [x] 本計画書のチェックリストを完了状態に更新する
 
@@ -176,7 +176,7 @@
 ## Step 2 での作業メモ
 
 - ブランチは **`main` を最新化したうえで** 切る（`git fetch origin && git checkout main && git pull` 相当）。
-- 変更ファイルの想定: `PreviewView.swift`, `FindBar.swift`, `preview.css`、（テストのみ）`MarkdownPreviewerTests/...`
+- 変更ファイルの想定: `PreviewView.swift`, `FindBar.swift`, `preview.css`、（テストのみ）`stillmdTests/...`
 - 本計画書は進捗証跡としてコミットに含める。
 - **実装ブランチ**: `cursor/find-preview-polish`（worktree `_worktrees/stillmd/cursor/find-preview-polish`）。
 - **追記（レビュー対応）**: `safeAreaInset` の有無で `Group` を分岐すると `MarkdownWebView` が再生成される恐れがあるため、**常に** `corePreview.safeAreaInset` を付け、非表示時は `Color.clear.frame(height: 0)` のみとした。

@@ -7,9 +7,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 APP_NAME="stillmd"
+EXECUTABLE_NAME="stillmd"
 ICON_SOURCE="$PROJECT_DIR/assets/app-icon/stillmd-icon.png"
 ICON_NAME="AppIcon"
-INFO_PLIST_SOURCE="$PROJECT_DIR/MarkdownPreviewer/Info.plist"
+INFO_PLIST_SOURCE="$PROJECT_DIR/stillmd/Info.plist"
 
 # Parse args
 BUILD_CONFIG="debug"
@@ -23,10 +24,10 @@ echo "=== Building $APP_NAME.app ($BUILD_CONFIG) ==="
 cd "$PROJECT_DIR"
 if [[ "$BUILD_CONFIG" == "release" ]]; then
     swift build -c release
-    BINARY_PATH=".build/release/MarkdownPreviewer"
+    BINARY_PATH=".build/release/$EXECUTABLE_NAME"
 else
     swift build
-    BINARY_PATH=".build/debug/MarkdownPreviewer"
+    BINARY_PATH=".build/debug/$EXECUTABLE_NAME"
 fi
 
 # Create .app bundle structure
@@ -76,7 +77,14 @@ else
 fi
 
 # Copy SPM resource bundle (contains marked.js, highlight.js, preview.css)
-RESOURCE_BUNDLE=$(find .build -name "MarkdownPreviewer_MarkdownPreviewer.bundle" -type d 2>/dev/null | head -1)
+RESOURCE_BUNDLE="$(
+    find .build -name "*.bundle" -type d 2>/dev/null | while read -r bundle; do
+        if [[ -n "$(find "$bundle" -name "preview.css" -type f -print -quit 2>/dev/null)" ]]; then
+            echo "$bundle"
+            break
+        fi
+    done
+)"
 if [[ -n "$RESOURCE_BUNDLE" ]]; then
     cp -R "$RESOURCE_BUNDLE" "$RESOURCES_DIR/"
     echo "  Copied resource bundle: $(basename "$RESOURCE_BUNDLE")"

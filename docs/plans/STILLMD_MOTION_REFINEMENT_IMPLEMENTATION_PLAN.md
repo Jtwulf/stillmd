@@ -103,12 +103,12 @@
 
 ## 4. 対象ファイル
 
-- `MarkdownPreviewer/Views/StillmdMotion.swift`
-- `MarkdownPreviewer/Views/RootView.swift`
-- `MarkdownPreviewer/Views/EmptyStateView.swift`
-- `MarkdownPreviewer/Views/PreviewView.swift`
-- `MarkdownPreviewer/Views/FindBar.swift`
-- `MarkdownPreviewerTests/MarkdownPreviewerTests.swift`
+- `stillmd/Views/StillmdMotion.swift`
+- `stillmd/Views/RootView.swift`
+- `stillmd/Views/EmptyStateView.swift`
+- `stillmd/Views/PreviewView.swift`
+- `stillmd/Views/FindBar.swift`
+- `stillmdTests/StillmdTests.swift`
 
 ## 5. Phase 分割
 
