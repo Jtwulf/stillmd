@@ -2,14 +2,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "MarkdownPreviewer",
+    name: "stillmd",
     platforms: [
         .macOS(.v15)
     ],
     targets: [
         .executableTarget(
-            name: "MarkdownPreviewer",
-            path: "MarkdownPreviewer",
+            name: "stillmd",
+            path: "stillmd",
             exclude: ["Info.plist"],
             resources: [
                 .copy("Resources/marked.min.js"),
@@ -18,9 +18,9 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "MarkdownPreviewerTests",
-            dependencies: ["MarkdownPreviewer"],
-            path: "MarkdownPreviewerTests"
+            name: "stillmdTests",
+            dependencies: ["stillmd"],
+            path: "stillmdTests"
         ),
     ]
 )

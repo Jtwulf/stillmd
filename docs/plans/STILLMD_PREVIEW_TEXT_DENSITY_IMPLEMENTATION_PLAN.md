@@ -36,14 +36,14 @@ stillmd のプレビュー本文について、現状より少しだけ密度を
 
 ### 関連コード
 
-- `MarkdownPreviewer/Resources/preview.css`
+- `stillmd/Resources/preview.css`
   - `body` に `font-size: calc(17px * var(--text-scale));`
   - `body` に `line-height: 1.82;`
   - 見出しに `letter-spacing: -0.02em;`
   - `pre` に `line-height: 1.62;`
-- `MarkdownPreviewer/Services/HTMLTemplate.swift`
+- `stillmd/Services/HTMLTemplate.swift`
   - CSS をそのまま埋め込む構造
-- `MarkdownPreviewer/Views/SettingsView.swift`
+- `stillmd/Views/SettingsView.swift`
   - 明示設定は `Theme` と `Text Scale` のみ
 - `docs/rules/02-ui-implementation.md`
   - Settings 項目は最小限に保つ方針
@@ -143,17 +143,17 @@ Step 2 では、次の順で進める。
 
 ### 直接変更候補
 
-- `MarkdownPreviewer/Resources/preview.css`
+- `stillmd/Resources/preview.css`
 
 ### 基本的に変更不要
 
-- `MarkdownPreviewer/Services/HTMLTemplate.swift`
-- `MarkdownPreviewer/Views/SettingsView.swift`
-- `MarkdownPreviewer/Services/AppPreferences.swift`
+- `stillmd/Services/HTMLTemplate.swift`
+- `stillmd/Views/SettingsView.swift`
+- `stillmd/Services/AppPreferences.swift`
 
 ### テスト影響
 
-- `MarkdownPreviewerTests/MarkdownPreviewerTests.swift` の既存 CSS テストは、現状の内容を見る限り **値の固定比較をしていない**
+- `stillmdTests/StillmdTests.swift` の既存 CSS テストは、現状の内容を見る限り **値の固定比較をしていない**
 - そのため、今回の変更では **テスト追加なしでも成立する可能性が高い**
 - ただし Step 2 では、必要に応じて `preview.css` の本文 line-height を確認する軽いテスト追加を検討してよい
 

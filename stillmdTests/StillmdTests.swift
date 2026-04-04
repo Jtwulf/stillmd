@@ -1,7 +1,7 @@
 import Testing
 import Foundation
 import AppKit
-@testable import MarkdownPreviewer
+@testable import stillmd
 
 // MARK: - Task 2.2: Property Test — File Extension Validation (Property 1)
 // **Validates: Requirements 2.4**
@@ -1433,9 +1433,9 @@ struct CSSAndInfoPlistUnitTests {
     @Test("Info.plist file exists in source directory")
     func infoPlistExists() {
         let infoPlistPath = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()  // MarkdownPreviewerTests/
+            .deletingLastPathComponent()  // stillmdTests/
             .deletingLastPathComponent()  // stillmd/
-            .appendingPathComponent("MarkdownPreviewer")
+            .appendingPathComponent("stillmd")
             .appendingPathComponent("Info.plist")
 
         #expect(FileManager.default.fileExists(atPath: infoPlistPath.path),
@@ -1447,7 +1447,7 @@ struct CSSAndInfoPlistUnitTests {
         let infoPlistPath = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appendingPathComponent("MarkdownPreviewer")
+            .appendingPathComponent("stillmd")
             .appendingPathComponent("Info.plist")
 
         let content = try #require(try? String(contentsOf: infoPlistPath, encoding: .utf8))
@@ -1460,7 +1460,7 @@ struct CSSAndInfoPlistUnitTests {
         let infoPlistPath = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appendingPathComponent("MarkdownPreviewer")
+            .appendingPathComponent("stillmd")
             .appendingPathComponent("Info.plist")
 
         let content = try #require(try? String(contentsOf: infoPlistPath, encoding: .utf8))

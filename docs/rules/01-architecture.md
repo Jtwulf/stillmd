@@ -2,12 +2,12 @@
 
 ## 現在の主要構成
 
-- `MarkdownPreviewer/App/`: App entry point
-- `MarkdownPreviewer/Views/`: 画面表示、SwiftUI / WKWebView との接続
-- `MarkdownPreviewer/ViewModels/`: 表示状態と読み込み状態
-- `MarkdownPreviewer/Services/`: ファイル監視、リソース読み込み、バリデーションなどの補助責務
-- `MarkdownPreviewer/Resources/`: CSS、JS ライブラリ、静的リソース
-- `MarkdownPreviewerTests/`: テスト
+- `stillmd/App/`: App entry point
+- `stillmd/Views/`: 画面表示、SwiftUI / WKWebView との接続
+- `stillmd/ViewModels/`: 表示状態と読み込み状態
+- `stillmd/Services/`: ファイル監視、リソース読み込み、バリデーションなどの補助責務
+- `stillmd/Resources/`: CSS、JS ライブラリ、静的リソース
+- `stillmdTests/`: テスト
 
 ## 責務分離の原則
 
