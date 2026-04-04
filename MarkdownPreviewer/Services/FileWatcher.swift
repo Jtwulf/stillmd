@@ -41,13 +41,8 @@ final class FileWatcher: @unchecked Sendable {
             }
         }
 
-        source.setCancelHandler { [weak self] in
-            guard let self else { return }
-            if self.fileDescriptor >= 0 {
-                close(self.fileDescriptor)
-                self.fileDescriptor = -1
-            }
-        }
+        // No cancel handler that closes fd — we close fd synchronously in stop()
+        // to avoid race conditions when stop() + start() are called in sequence.
 
         source.resume()
         self.source = source
@@ -56,6 +51,10 @@ final class FileWatcher: @unchecked Sendable {
     func stop() {
         source?.cancel()
         source = nil
+        if fileDescriptor >= 0 {
+            close(fileDescriptor)
+            fileDescriptor = -1
+        }
     }
 
     private func handleWrite() {

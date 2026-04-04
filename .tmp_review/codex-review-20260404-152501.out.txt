@@ -1,0 +1,9 @@
+The patch introduces two user-facing regressions in core flows: in-app opening is never wired up, and rename-based saves can permanently break file watching. Those issues make primary app functionality unreliable.
+
+Full review comments:
+
+- [P1] Inject `openWindow` before using `WindowManager.openFile` — /Users/justinwulf/Documents/justin/work/querylift/service/stillmd/MarkdownPreviewer/App/MarkdownPreviewerApp.swift:8-10
+  `WindowManager.openFile` only works in production when `openWindowAction` has been set, but this scene constructs `PreviewView` directly so the only code that assigns that action (`OpenWindowInjector`) never runs. In practice, File > Open and dropping another Markdown file onto an existing preview both hit `guard let action = openWindowAction` and silently do nothing.
+
+- [P1] Avoid closing the new fd from the old watcher's cancel handler — /Users/justinwulf/Documents/justin/work/querylift/service/stillmd/MarkdownPreviewer/Services/FileWatcher.swift:44-49
+  When a rename/delete save path hits `handleDeleteOrRename()`, it calls `stop()` and then `start()` immediately. The canceled source's cancel handler runs asynchronously and closes `self.fileDescriptor`, so if `start()` has already stored the replacement descriptor there, the old handler closes the new watch and sets it to `-1`; after a common atomic-save cycle, further edits stop auto-reloading entirely.
