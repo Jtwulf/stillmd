@@ -23,6 +23,7 @@ struct MarkdownPreviewerApp: App {
     var body: some Scene {
         WindowGroup(for: URL.self) { $url in
             RootView(fileURL: $url, windowManager: windowManager)
+                .preferredColorScheme(themePreference.colorScheme)
                 .frame(
                     minWidth: WindowDefaults.minimumWidth,
                     minHeight: WindowDefaults.minimumHeight
@@ -48,6 +49,11 @@ struct MarkdownPreviewerApp: App {
             width: WindowDefaults.defaultWidth,
             height: WindowDefaults.defaultHeight
         )
+
+        Settings {
+            SettingsView()
+                .preferredColorScheme(themePreference.colorScheme)
+        }
     }
 }
 
