@@ -89,17 +89,23 @@ struct PreviewView: View {
     @ViewBuilder
     private var corePreview: some View {
         if shouldKeepPreviewVisible {
-            MarkdownWebView(
-                markdownContent: viewModel.markdownContent,
-                baseURL: fileURL.deletingLastPathComponent(),
-                scrollPosition: $viewModel.scrollPosition,
-                themePreference: themePreference,
-                textScale: AppPreferences.clampedTextScale(textScale),
-                documentLineNumbersVisible: isDocumentLineNumbersPresented,
-                findQuery: findQuery,
-                findRequest: findRequest,
-                findStatus: $findStatus
-            )
+            // `GeometryReader` defaults to min height in stacks; outer `frame(max…)` gives it a real size so
+            // `NSViewRepresentable` is not laid out with a zero proposal (blank white preview).
+            GeometryReader { proxy in
+                MarkdownWebView(
+                    markdownContent: viewModel.markdownContent,
+                    baseURL: fileURL.deletingLastPathComponent(),
+                    scrollPosition: $viewModel.scrollPosition,
+                    themePreference: themePreference,
+                    textScale: AppPreferences.clampedTextScale(textScale),
+                    documentLineNumbersVisible: isDocumentLineNumbersPresented,
+                    findQuery: findQuery,
+                    findRequest: findRequest,
+                    findStatus: $findStatus
+                )
+                .frame(width: proxy.size.width, height: proxy.size.height)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let error = viewModel.errorMessage {
             ErrorView(message: error)
         }

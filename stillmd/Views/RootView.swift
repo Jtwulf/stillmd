@@ -69,6 +69,7 @@ struct RootView: View {
     private var rootContent: some View {
         if let url = documentSession.fileURL {
             PreviewView(fileURL: url, windowManager: windowManager)
+                .id(url.path)
         } else {
             EmptyStateView(
                 onOpen: {

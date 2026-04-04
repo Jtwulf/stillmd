@@ -2,31 +2,26 @@ import AppKit
 import SwiftUI
 import WebKit
 
-/// Hosts a `WKWebView` with edge constraints. Returning `WKWebView` directly from `NSViewRepresentable`
-/// often yields a zero-height layout inside `NSHostingView`; the container guarantees a non-zero clip rect.
+/// Hosts a `WKWebView` stretched to the frame SwiftUI/`NSHostingView` assigns.
+/// Pure Auto Layout on the container failed for some users; classic autoresizing + `layout()` is more reliable here.
 final class StillmdMarkdownWebContainerView: NSView {
     let webView: WKWebView
 
     init(webView: WKWebView) {
         self.webView = webView
         super.init(frame: .zero)
-        translatesAutoresizingMaskIntoConstraints = false
-        webView.translatesAutoresizingMaskIntoConstraints = false
+        autoresizingMask = [.width, .height]
         addSubview(webView)
-        NSLayoutConstraint.activate([
-            webView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            webView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            webView.topAnchor.constraint(equalTo: topAnchor),
-            webView.bottomAnchor.constraint(equalTo: bottomAnchor),
-        ])
-        setContentHuggingPriority(.defaultLow, for: .vertical)
-        setContentHuggingPriority(.defaultLow, for: .horizontal)
-        setContentCompressionResistancePriority(.defaultLow, for: .vertical)
-        setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        webView.autoresizingMask = [.width, .height]
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layout() {
+        super.layout()
+        webView.frame = bounds
     }
 }
 
@@ -52,7 +47,8 @@ struct MarkdownWebView: NSViewRepresentable {
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
-        webView.setValue(false, forKey: "drawsBackground")
+        // Opaque drawing avoids showing through to an unintended light layer when HTML is still loading.
+        webView.setValue(true, forKey: "drawsBackground")
 
         let html = HTMLTemplate.build(
             markdownContent: markdownContent,
