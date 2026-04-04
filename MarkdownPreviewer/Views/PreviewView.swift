@@ -28,22 +28,16 @@ struct PreviewView: View {
         viewModel.errorMessage == nil || !viewModel.markdownContent.isEmpty
     }
 
-    /// エラー帯または検索バーを出すときだけ top inset を使い、空のインセット行でグレー帯が出ないようにする。
+    /// エラー帯または検索バー表示中のみインセット内に実コンテンツを置く（非表示時は高さ 0 でプレースホルダ）。
     private var shouldShowTopChrome: Bool {
         isFindBarPresented || (viewModel.errorMessage != nil && shouldKeepPreviewVisible)
     }
 
     var body: some View {
-        Group {
-            if shouldShowTopChrome {
-                corePreview
-                    .safeAreaInset(edge: .top, spacing: 0) {
-                        topChrome
-                    }
-            } else {
-                corePreview
+        corePreview
+            .safeAreaInset(edge: .top, spacing: 0) {
+                topChrome
             }
-        }
         .navigationTitle(fileURL.lastPathComponent)
         .background(WindowAccessor(url: fileURL.standardizedFileURL))
         .onAppear {
@@ -106,24 +100,29 @@ struct PreviewView: View {
 
     @ViewBuilder
     private var topChrome: some View {
-        VStack(alignment: .trailing, spacing: 8) {
-            if let error = viewModel.errorMessage, shouldKeepPreviewVisible {
-                InlineStatusBanner(message: error)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        if shouldShowTopChrome {
+            VStack(alignment: .trailing, spacing: 8) {
+                if let error = viewModel.errorMessage, shouldKeepPreviewVisible {
+                    InlineStatusBanner(message: error)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if isFindBarPresented {
+                    FindBar(
+                        query: $findQuery,
+                        status: findStatus,
+                        onPrevious: { triggerFind(.previous) },
+                        onNext: { triggerFind(.next) },
+                        onClose: dismissFindBar
+                    )
+                }
             }
-            if isFindBarPresented {
-                FindBar(
-                    query: $findQuery,
-                    status: findStatus,
-                    onPrevious: { triggerFind(.previous) },
-                    onNext: { triggerFind(.next) },
-                    onClose: dismissFindBar
-                )
-            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .background(Color.clear)
+        } else {
+            // インセット修飾子自体は常に同じビュー木に載せ、`MarkdownWebView` の再生成を避ける
+            Color.clear.frame(height: 0)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .background(Color.clear)
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {

@@ -179,3 +179,4 @@
 - 変更ファイルの想定: `PreviewView.swift`, `FindBar.swift`, `preview.css`、（テストのみ）`MarkdownPreviewerTests/...`
 - 本計画書は進捗証跡としてコミットに含める。
 - **実装ブランチ**: `cursor/find-preview-polish`（worktree `_worktrees/stillmd/cursor/find-preview-polish`）。
+- **追記（レビュー対応）**: `safeAreaInset` の有無で `Group` を分岐すると `MarkdownWebView` が再生成される恐れがあるため、**常に** `corePreview.safeAreaInset` を付け、非表示時は `Color.clear.frame(height: 0)` のみとした。
