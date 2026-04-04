@@ -31,6 +31,7 @@ struct RootView: View {
 
             rootContent
         }
+        .preferredColorScheme(themePreference.colorScheme)
         .onAppear {
             if documentSession.fileURL != nil {
                 isEmptyStatePresented = false
