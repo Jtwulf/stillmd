@@ -9,7 +9,7 @@ struct RootView: View {
     @AppStorage(AppPreferences.themeKey) private var themePreferenceRawValue =
         ThemePreference.system.rawValue
 
-    @State private var isReady = false
+    @State private var isEmptyStatePresented = false
     @State private var isDropTargeted = false
 
     private var themePreference: ThemePreference {
@@ -29,21 +29,8 @@ struct RootView: View {
             WindowSurfacePalette.background(for: resolvedColorScheme)
                 .ignoresSafeArea()
 
-            Group {
-                if let url = fileURL {
-                    PreviewView(fileURL: url, windowManager: windowManager)
-                } else {
-                    EmptyStateView(
-                        onOpen: {
-                            openFileInCurrentWindow()
-                        },
-                        isDropTargeted: isDropTargeted
-                    )
-                }
-            }
+            rootContent
         }
-        .opacity(isReady ? 1 : 0)
-        .animation(.easeOut(duration: 0.16), value: isReady)
         .overlay(alignment: .top) {
             Text(windowTitle)
                 .font(.system(size: 12, weight: .semibold))
@@ -66,20 +53,20 @@ struct RootView: View {
             windowManager.openWindowAction = openWindow
 
             if fileURL != nil {
-                isReady = true
+                isEmptyStatePresented = false
                 return
             }
 
             if consumePendingURLs() {
-                isReady = true
+                isEmptyStatePresented = false
                 return
             }
 
             revealEmptyStateIfNeeded()
         }
         .onChange(of: pendingFileOpenCoordinator.pendingChangeID) { _, _ in
-            if consumePendingURLs(), !isReady {
-                isReady = true
+            if consumePendingURLs() {
+                isEmptyStatePresented = false
             }
         }
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
@@ -88,19 +75,32 @@ struct RootView: View {
         .navigationTitle(windowTitle)
     }
 
+    @ViewBuilder
+    private var rootContent: some View {
+        if let url = fileURL {
+            PreviewView(fileURL: url, windowManager: windowManager)
+        } else {
+            EmptyStateView(
+                onOpen: {
+                    openFileInCurrentWindow()
+                },
+                isDropTargeted: isDropTargeted,
+                isPresented: isEmptyStatePresented
+            )
+        }
+    }
+
     private func revealEmptyStateIfNeeded() {
         Task { @MainActor in
             await Task.yield()
 
             if consumePendingURLs() {
-                isReady = true
+                isEmptyStatePresented = false
                 return
             }
 
-            if !isReady {
-                withAnimation(.easeOut(duration: 0.16)) {
-                    isReady = true
-                }
+            if !isEmptyStatePresented {
+                isEmptyStatePresented = true
             }
         }
     }
@@ -128,9 +128,7 @@ struct RootView: View {
         FileValidation.configureOpenPanel(panel, allowsMultipleSelection: false)
         if panel.runModal() == .OK, let url = panel.url {
             fileURL = url
-            if !isReady {
-                isReady = true
-            }
+            isEmptyStatePresented = false
         }
     }
 
