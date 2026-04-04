@@ -1375,6 +1375,14 @@ struct CSSAndInfoPlistUnitTests {
                 "preview.css should include SF Mono in font-family")
     }
 
+    @Test("preview.css body line-height is 1.74")
+    func cssBodyLineHeightIsUpdated() throws {
+        let cssURL = Bundle.module.url(forResource: "preview", withExtension: "css")
+        let css = try #require(try? String(contentsOf: cssURL!, encoding: .utf8))
+        #expect(css.contains("line-height: 1.74;"),
+                "preview.css should keep the body line-height fixed at 1.74")
+    }
+
     // --- Info.plist Tests ---
 
     @Test("Info.plist file exists in source directory")
