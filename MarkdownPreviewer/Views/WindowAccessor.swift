@@ -94,6 +94,11 @@ struct WindowAccessor: NSViewRepresentable {
     func updateNSView(_ nsView: NSView, context: Context) {
         context.coordinator.hostView = nsView
         updateWindow(from: nsView, coordinator: context.coordinator)
+        // `view.window` is often nil on the first `updateNSView` pass; retry next run loop
+        // with the same captured configuration (avoids reordering issues vs a `makeNSView` Task).
+        DispatchQueue.main.async {
+            updateWindow(from: nsView, coordinator: context.coordinator)
+        }
     }
 
     static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
@@ -240,7 +245,7 @@ struct WindowAccessor: NSViewRepresentable {
                     object: window,
                     queue: .main
                 ) { [weak self] _ in
-                    MainActor.assumeIsolated {
+                    DispatchQueue.main.async {
                         self?.lifecycleReapply?()
                     }
                 }
