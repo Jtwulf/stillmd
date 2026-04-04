@@ -521,6 +521,7 @@ struct HTMLTemplateUnitTests {
         #expect(html.contains("rectsForDocumentLineCandidate"))
         #expect(html.contains("mergeVisualLineRects"))
         #expect(html.contains("globalMergeVisualLineRows"))
+        #expect(html.contains("DOC_LINE_MERGE_EPSILON_GLOBAL_PX"))
         #expect(html.contains("rowRects"))
     }
 

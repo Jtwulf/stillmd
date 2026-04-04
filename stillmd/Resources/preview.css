@@ -89,7 +89,9 @@ body {
     justify-content: flex-end;
     padding-right: 0.75rem;
     font-size: 0.72em;
-    line-height: 1;
+    line-height: 1.2;
+    min-height: 1.2em;
+    box-sizing: border-box;
     color: var(--muted-color);
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;

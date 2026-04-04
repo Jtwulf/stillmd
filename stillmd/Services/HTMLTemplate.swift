@@ -214,6 +214,10 @@ enum HTMLTemplate {
                     });
                 }
 
+                // Marker vs text / inline spans: tops can differ by ~10px on one typographic line.
+                const DOC_LINE_MERGE_EPSILON_INNER_PX = 10;
+                const DOC_LINE_MERGE_EPSILON_GLOBAL_PX = 14;
+
                 // getClientRects() can return multiple boxes per typographic line (e.g. inline <code>),
                 // which would stack multiple line numbers at the same Y — merge by baseline proximity.
                 function mergeVisualLineRects(rawRects) {
@@ -222,7 +226,7 @@ enum HTMLTemplate {
                     }
                     const sorted = rawRects.slice().sort((a, b) => a.top - b.top || a.left - b.left);
                     const merged = [];
-                    const epsilon = 5;
+                    const epsilon = DOC_LINE_MERGE_EPSILON_INNER_PX;
                     for (const rect of sorted) {
                         const h = Math.max(rect.height, 1);
                         const last = merged[merged.length - 1];
@@ -243,7 +247,7 @@ enum HTMLTemplate {
                     }
                     const sorted = rows.slice().sort((a, b) => a.top - b.top);
                     const merged = [];
-                    const epsilon = 5;
+                    const epsilon = DOC_LINE_MERGE_EPSILON_GLOBAL_PX;
                     for (const row of sorted) {
                         const last = merged[merged.length - 1];
                         if (last && Math.abs(row.top - last.top) < epsilon) {
