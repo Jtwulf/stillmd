@@ -57,6 +57,10 @@ enum HTMLTemplate {
                     const link = e.target.closest('a');
                     if (link && link.href) {
                         const url = new URL(link.href);
+                        if (url.protocol === 'javascript:') {
+                            e.preventDefault();
+                            return;
+                        }
                         if (url.protocol === 'http:' || url.protocol === 'https:') {
                             e.preventDefault();
                             window.webkit.messageHandlers.linkClicked.postMessage(link.href);

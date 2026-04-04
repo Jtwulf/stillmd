@@ -1,0 +1,12 @@
+The patch introduces at least one immediate functional regression in normal app usage (`Open…` and drag-and-drop do not open files), and it also leaves a clickable-script path for malicious Markdown links. Those issues are sufficient to consider the patch incorrect.
+
+Full review comments:
+
+- [P1] Initialize `openWindowAction` before any in-app opens — /Users/justinwulf/Documents/justin/work/querylift/service/stillmd/MarkdownPreviewer/Services/WindowManager.swift:24-29
+  `WindowManager.openFile()` is the only path used by the Open… command and by drag-and-drop, but nothing in this patch ever assigns `openWindowAction`. In production `_testOpenWindowHandler` is unset, so `openFile` returns from the nil guard here without creating a scene. Users who launch the app normally and try `⌘O` or drop a Markdown file onto an existing window will see a no-op.
+
+- [P1] Reject non-HTTP link schemes from rendered Markdown — /Users/justinwulf/Documents/justin/work/querylift/service/stillmd/MarkdownPreviewer/Services/HTMLTemplate.swift:59-63
+  This click handler only prevents default navigation for `http`/`https`, but the bundled marked v15 parser does not sanitize link schemes, so `[x](javascript:...)` is rendered unchanged. Because `MarkdownWebView` also allows every non-HTTP(S) navigation through its delegate, clicking a `javascript:` link in an untrusted Markdown file can execute script inside the preview instead of being blocked.
+
+- [P2] Bind `representedURL` to the actual hosting window — /Users/justinwulf/Documents/justin/work/querylift/service/stillmd/MarkdownPreviewer/Views/PreviewView.swift:32-35
+  In multi-window use, this code updates the first key window in the app, not necessarily the window that owns this `PreviewView`. If another preview is still key while a new one appears, the old window's `representedURL` gets overwritten with the new file URL; after that, `WindowManager.bringToFront(_:)` can focus the wrong window or fail to find the existing one at all. This breaks duplicate-window handling once more than one file is open.

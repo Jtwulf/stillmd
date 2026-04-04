@@ -66,6 +66,10 @@ struct MarkdownWebView: NSViewRepresentable {
             decidePolicyFor navigationAction: WKNavigationAction,
             decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
         ) {
+            if let url = navigationAction.request.url, url.scheme == "javascript" {
+                decisionHandler(.cancel)
+                return
+            }
             if navigationAction.navigationType == .linkActivated,
                let url = navigationAction.request.url,
                url.scheme == "http" || url.scheme == "https" {
@@ -89,7 +93,8 @@ struct MarkdownWebView: NSViewRepresentable {
                 }
             case "linkClicked":
                 if let urlString = message.body as? String,
-                   let url = URL(string: urlString) {
+                   let url = URL(string: urlString),
+                   url.scheme != "javascript" {
                     NSWorkspace.shared.open(url)
                 }
             default:

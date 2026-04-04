@@ -25,15 +25,9 @@ struct PreviewView: View {
             }
         }
         .navigationTitle(fileURL.lastPathComponent)
+        .background(WindowAccessor(url: fileURL.standardizedFileURL))
         .onAppear {
             viewModel.startWatching()
-            // Set representedURL on the hosting NSWindow so WindowManager
-            // can identify windows by full URL instead of title alone.
-            DispatchQueue.main.async {
-                if let window = NSApp.windows.first(where: { $0.isKeyWindow }) {
-                    window.representedURL = fileURL.standardizedFileURL
-                }
-            }
         }
         .onDisappear {
             viewModel.stopWatching()
