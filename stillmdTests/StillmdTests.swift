@@ -469,6 +469,7 @@ struct HTMLTemplateUnitTests {
         #expect(html.contains("documentLineNumberOverlay.getBoundingClientRect"))
         #expect(html.contains("classList.contains('stillmd-code-line')"))
         #expect(html.contains("rectsForDocumentLineCandidate"))
+        #expect(html.contains("mergeVisualLineRects"))
         #expect(html.contains("rowRects"))
     }
 

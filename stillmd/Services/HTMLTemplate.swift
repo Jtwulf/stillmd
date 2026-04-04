@@ -214,6 +214,28 @@ enum HTMLTemplate {
                     });
                 }
 
+                // getClientRects() can return multiple boxes per typographic line (e.g. inline <code>),
+                // which would stack multiple line numbers at the same Y — merge by baseline proximity.
+                function mergeVisualLineRects(rawRects) {
+                    if (!rawRects.length) {
+                        return [];
+                    }
+                    const sorted = rawRects.slice().sort((a, b) => a.top - b.top || a.left - b.left);
+                    const merged = [];
+                    const epsilon = 5;
+                    for (const rect of sorted) {
+                        const h = Math.max(rect.height, 1);
+                        const last = merged[merged.length - 1];
+                        if (last && Math.abs(rect.top - last.top) < epsilon) {
+                            const bottom = Math.max(last.top + last.height, rect.top + h);
+                            last.height = Math.max(1, bottom - last.top);
+                        } else {
+                            merged.push({ top: rect.top, height: h });
+                        }
+                    }
+                    return merged;
+                }
+
                 function layoutDocumentLineNumbers() {
                     if (!viewerState.documentLineNumbersVisible) {
                         clearDocumentLineNumbers();
@@ -237,10 +259,11 @@ enum HTMLTemplate {
                         let rects = Array.from(range.getClientRects()).filter((rect) => {
                             return rect.width > 0 && rect.height > 0;
                         });
+                        rects = mergeVisualLineRects(rects);
                         if (!rects.length) {
                             const fallbackRect = candidate.getBoundingClientRect();
                             if (fallbackRect.width > 0 || fallbackRect.height > 0) {
-                                rects = [fallbackRect];
+                                rects = mergeVisualLineRects([fallbackRect]);
                             }
                         }
                         return rects;
