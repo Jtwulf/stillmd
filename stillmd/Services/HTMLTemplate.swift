@@ -236,6 +236,26 @@ enum HTMLTemplate {
                     return merged;
                 }
 
+                // Same-baseline rows can come from *different* DOM nodes (e.g. nested list markers vs text).
+                function globalMergeVisualLineRows(rows) {
+                    if (!rows.length) {
+                        return [];
+                    }
+                    const sorted = rows.slice().sort((a, b) => a.top - b.top);
+                    const merged = [];
+                    const epsilon = 5;
+                    for (const row of sorted) {
+                        const last = merged[merged.length - 1];
+                        if (last && Math.abs(row.top - last.top) < epsilon) {
+                            const bottom = Math.max(last.top + last.height, row.top + row.height);
+                            last.height = Math.max(1, bottom - last.top);
+                        } else {
+                            merged.push({ top: row.top, height: row.height });
+                        }
+                    }
+                    return merged;
+                }
+
                 function layoutDocumentLineNumbers() {
                     if (!viewerState.documentLineNumbersVisible) {
                         clearDocumentLineNumbers();
@@ -290,6 +310,7 @@ enum HTMLTemplate {
                             });
                         }
                     }
+                    const mergedRowRects = globalMergeVisualLineRows(rowRects);
 
                     const overlayRect = documentLineNumberOverlay.getBoundingClientRect();
                     const contentRect = contentElement.getBoundingClientRect();
@@ -300,11 +321,11 @@ enum HTMLTemplate {
 
                     const columnRect = documentLineNumberColumn.getBoundingClientRect();
                     const fragment = document.createDocumentFragment();
-                    for (let i = 0; i < rowRects.length; i++) {
+                    for (let i = 0; i < mergedRowRects.length; i++) {
                         const row = document.createElement('div');
                         row.className = 'document-line-number';
                         row.textContent = String(i + 1);
-                        const r = rowRects[i];
+                        const r = mergedRowRects[i];
                         row.style.top = `${r.top - columnRect.top}px`;
                         row.style.height = `${r.height}px`;
                         fragment.appendChild(row);
