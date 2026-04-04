@@ -45,10 +45,11 @@
 
 ### 3.2 トリガー
 
-- **初回:** `PreviewView` の `onAppear` で `Task.yield()` の後に reveal（empty と同型）
-- **ファイル切替（合意 B）:** `fileURL`（またはそれに相当する識別子）の変化を検知し、**非表示状態に戻してから**同じ reveal シーケンスを再度実行する
-  - **実装確定:** `RootView` で `PreviewView` に `.id(url.standardizedFileURL.path)` を付与し、URL 変更時に **ビュー（と `StateObject` の ViewModel）を再生成**する。これで `onAppear` の `schedulePreviewReveal()` が再度走り、かつドキュメント読み込みも正しいパスに向く。
-  - 予定していた `onChange(of: fileURL)` は、`fileURL` が `let` かつ上記 `.id` によりインスタンス単位で URL が固定になるため **不要**。
+- **初回（`MarkdownWebView`）:** `MarkdownWebView.makeNSView` 冒頭の `onWillLoadWebContent` で `schedulePreviewReveal()` を呼び、`loadHTMLString`・`didCommit` より先にスケジュール ID を確定させる（`onAppear` より前に WebKit が動き得るため）。
+- **初回（`ErrorView` のみ）:** `shouldKeepPreviewVisible == false` のとき `onAppear` で `schedulePreviewReveal()`（`Task.yield()` 後に reveal）。
+- **WebKit 側の完了:** 初回の main frame `didCommit` で reveal 完了（サブリソースより前）。500ms フォールバックで `didCommit` 欠落時も最終的に表示。
+- **ファイル切替（合意 B）:** `RootView` の `PreviewView` に `.id(url.standardizedFileURL.path)` を付与し、URL 変更で View を再生成。
+- **本文 → エラーへ切替:** `shouldKeepPreviewVisible` が `true` → `false` に変わったとき `schedulePreviewReveal()` を再実行（削除後に `ErrorView` へ移る場合の入場を揃える）。
 
 ### 3.3 UI の適用範囲（合意 1.B）
 
