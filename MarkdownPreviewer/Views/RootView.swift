@@ -31,16 +31,6 @@ struct RootView: View {
 
             rootContent
         }
-        .overlay(alignment: .top) {
-            Text(windowTitle)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .padding(.top, 8)
-                .padding(.horizontal, 120)
-                .allowsHitTesting(false)
-        }
         .background(
             WindowAccessor(
                 fileURL: fileURL?.standardizedFileURL,
