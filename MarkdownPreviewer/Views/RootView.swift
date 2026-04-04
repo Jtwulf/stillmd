@@ -6,40 +6,42 @@ struct RootView: View {
     @ObservedObject var windowManager: WindowManager
     @Environment(\.openWindow) private var openWindow
 
-    // Timer to check for pending URLs from AppDelegate.
-    // application(_:open:) can fire slightly after onAppear.
-    @State private var pendingCheckTimer: Timer?
+    @State private var isReady = false
+    @State private var waitingForPendingURL = true
 
     var body: some View {
         Group {
             if let url = fileURL {
                 PreviewView(fileURL: url, windowManager: windowManager)
-            } else {
+            } else if !waitingForPendingURL {
                 EmptyStateView {
                     openFileInCurrentWindow()
                 }
+            } else {
+                Color.clear
             }
         }
+        .opacity(isReady ? 1 : 0)
+        .animation(.easeIn(duration: 0.15), value: isReady)
         .onAppear {
             windowManager.openWindowAction = openWindow
+
+            if fileURL != nil {
+                waitingForPendingURL = false
+                isReady = true
+                return
+            }
+
             consumePendingURLs()
 
-            // Keep checking for a short period in case application(_:open:)
-            // fires after onAppear (common on cold start).
-            pendingCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-                Task { @MainActor in
-                    consumePendingURLs()
-                }
+            if fileURL != nil {
+                waitingForPendingURL = false
+                isReady = true
+                return
             }
-            // Stop checking after 2 seconds
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                pendingCheckTimer?.invalidate()
-                pendingCheckTimer = nil
-            }
-        }
-        .onDisappear {
-            pendingCheckTimer?.invalidate()
-            pendingCheckTimer = nil
+
+            // Poll for pending URLs from AppDelegate (cold start timing)
+            startPendingURLPolling()
         }
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
             handleDrop(providers)
@@ -47,22 +49,37 @@ struct RootView: View {
         .navigationTitle(fileURL?.lastPathComponent ?? "StillMD")
     }
 
+    private func startPendingURLPolling() {
+        Task { @MainActor in
+            for _ in 0..<20 { // up to 1 second
+                try? await Task.sleep(for: .milliseconds(50))
+                consumePendingURLs()
+                if fileURL != nil {
+                    waitingForPendingURL = false
+                    withAnimation(.easeIn(duration: 0.15)) {
+                        isReady = true
+                    }
+                    return
+                }
+            }
+            // No pending URL arrived — show EmptyStateView
+            waitingForPendingURL = false
+            withAnimation(.easeIn(duration: 0.15)) {
+                isReady = true
+            }
+        }
+    }
+
     private func consumePendingURLs() {
         guard !AppDelegate.pendingURLs.isEmpty else { return }
 
         if fileURL == nil {
-            // This window has no file — use the first pending URL here
             fileURL = AppDelegate.pendingURLs.removeFirst()
         }
-        // Open remaining URLs in new windows
         for url in AppDelegate.pendingURLs {
             openWindow(value: url)
         }
         AppDelegate.pendingURLs.removeAll()
-
-        // Stop the timer once we've consumed URLs
-        pendingCheckTimer?.invalidate()
-        pendingCheckTimer = nil
     }
 
     private func openFileInCurrentWindow() {
