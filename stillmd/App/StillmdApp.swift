@@ -77,5 +77,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard !mdURLs.isEmpty else { return }
 
         pendingFileOpenCoordinator.enqueue(mdURLs)
+
+        // Without a document window, no `RootView` observes `pendingChangeID` to drain the queue.
+        let hasDocumentWindow = NSApp.windows.contains { $0 is StillmdDocumentWindow }
+        if !hasDocumentWindow {
+            DocumentWindowFactory.openDocument(
+                windowManager: windowManager,
+                pendingCoordinator: pendingFileOpenCoordinator
+            )
+        }
     }
 }
