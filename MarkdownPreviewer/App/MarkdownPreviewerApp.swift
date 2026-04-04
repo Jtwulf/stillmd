@@ -27,6 +27,7 @@ struct MarkdownPreviewerApp: App {
                 windowManager: windowManager,
                 pendingFileOpenCoordinator: appDelegate.pendingFileOpenCoordinator
             )
+                .preferredColorScheme(themePreference.colorScheme)
                 .frame(
                     minWidth: WindowDefaults.minimumWidth,
                     minHeight: WindowDefaults.minimumHeight
@@ -52,6 +53,11 @@ struct MarkdownPreviewerApp: App {
             width: WindowDefaults.defaultWidth,
             height: WindowDefaults.defaultHeight
         )
+
+        Settings {
+            SettingsView()
+                .preferredColorScheme(themePreference.colorScheme)
+        }
     }
 }
 
