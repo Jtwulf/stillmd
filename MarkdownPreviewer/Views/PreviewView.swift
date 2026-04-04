@@ -96,27 +96,32 @@ struct PreviewView: View {
         }
     }
 
+    @ViewBuilder
     private var topChrome: some View {
-        VStack(alignment: .trailing, spacing: 8) {
-            if let error = viewModel.errorMessage, shouldKeepPreviewVisible {
-                InlineStatusBanner(message: error)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+        if shouldShowTopChrome {
+            VStack(alignment: .trailing, spacing: 8) {
+                if let error = viewModel.errorMessage, shouldKeepPreviewVisible {
+                    InlineStatusBanner(message: error)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
 
-            if isFindBarPresented {
-                FindBar(
-                    query: $findQuery,
-                    status: findStatus,
-                    onPrevious: { triggerFind(.previous) },
-                    onNext: { triggerFind(.next) },
-                    onClose: dismissFindBar
-                )
-                .transition(StillmdMotion.findBarTransition(reduceMotion: reduceMotion))
+                if isFindBarPresented {
+                    FindBar(
+                        query: $findQuery,
+                        status: findStatus,
+                        onPrevious: { triggerFind(.previous) },
+                        onNext: { triggerFind(.next) },
+                        onClose: dismissFindBar
+                    )
+                    .transition(StillmdMotion.findBarTransition(reduceMotion: reduceMotion))
+                }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .background(Color.clear)
+        } else {
+            Color.clear.frame(height: 0)
         }
-        .padding(.horizontal, shouldShowTopChrome ? 16 : 0)
-        .padding(.top, shouldShowTopChrome ? 12 : 0)
-        .background(Color.clear)
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
