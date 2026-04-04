@@ -56,15 +56,15 @@ struct PreviewView: View {
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
             handleDrop(providers)
         }
-        .focusedSceneValue(\.showFindBarAction, FindAction(perform: presentFindBar))
-        .focusedSceneValue(\.findNextAction, FindAction(perform: {
+        .focusedValue(\.showFindBarAction, FindAction(perform: presentFindBar))
+        .focusedValue(\.findNextAction, FindAction(perform: {
             if !isFindBarPresented {
                 presentFindBar()
                 return
             }
             triggerFind(.next)
         }))
-        .focusedSceneValue(\.findPreviousAction, FindAction(perform: {
+        .focusedValue(\.findPreviousAction, FindAction(perform: {
             if !isFindBarPresented {
                 presentFindBar()
                 return
