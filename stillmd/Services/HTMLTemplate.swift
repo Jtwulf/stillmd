@@ -8,7 +8,8 @@ enum HTMLTemplate {
         css: String,
         initialScrollPosition: Double = 0,
         themePreference: String = ThemePreference.system.rawValue,
-        textScale: Double = AppPreferences.defaultTextScale
+        textScale: Double = AppPreferences.defaultTextScale,
+        documentLineNumbersVisible: Bool = false
     ) -> String {
         let escapedMarkdown = markdownContent
             .replacingOccurrences(of: "\\", with: "\\\\")
@@ -31,6 +32,9 @@ enum HTMLTemplate {
             <script>\(highlightJS)</script>
         </head>
         <body>
+            <div id="document-line-number-overlay" aria-hidden="true">
+                <div id="document-line-number-column"></div>
+            </div>
             <div id="content"></div>
             <script>
                 // Strip raw HTML blocks from markdown output for security.
@@ -56,27 +60,183 @@ enum HTMLTemplate {
                 // Initial render
                 const md = `\(escapedMarkdown)`;
                 const contentElement = document.getElementById('content');
+                const documentLineNumberOverlay = document.getElementById('document-line-number-overlay');
+                const documentLineNumberColumn = document.getElementById('document-line-number-column');
                 const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
                 const scrollHandler = window.webkit.messageHandlers.scrollPosition;
                 const findResultsHandler = window.webkit.messageHandlers.findResults;
                 const initialScrollY = \(initialScrollPosition);
                 const initialThemePreference = "\(escapedThemePreference)";
                 const initialTextScale = \(textScale);
+                const initialDocumentLineNumbersVisible = \(documentLineNumbersVisible ? "true" : "false");
                 const viewerState = {
                     themePreference: initialThemePreference,
                     findQuery: '',
+                    documentLineNumbersVisible: initialDocumentLineNumbersVisible,
                 };
                 let findMatches = [];
                 let findState = { currentIndex: -1 };
+                let documentLineNumberLayoutPending = false;
+
+                function escapeHTML(value) {
+                    return value
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/'/g, '&#39;');
+                }
+
+                function getCodeLanguage(codeElement) {
+                    for (const className of codeElement.classList) {
+                        if (className.startsWith('language-')) {
+                            return className.slice('language-'.length);
+                        }
+                    }
+                    return '';
+                }
+
+                function renderCodeBlock(codeElement) {
+                    const pre = codeElement.parentElement;
+                    if (!pre || pre.dataset.stillmdCodeDecorated === 'true') {
+                        return;
+                    }
+
+                    pre.dataset.stillmdCodeDecorated = 'true';
+
+                    const language = getCodeLanguage(codeElement);
+                    const rawText = codeElement.textContent || '';
+                    const lines = rawText.split(/\r?\n/);
+
+                    const block = document.createElement('div');
+                    block.className = 'stillmd-code-block';
+
+                    const gutter = document.createElement('div');
+                    gutter.className = 'stillmd-code-gutter';
+
+                    const linesContainer = document.createElement('div');
+                    linesContainer.className = 'stillmd-code-lines';
+
+                    lines.forEach((line, index) => {
+                        const lineNumber = document.createElement('span');
+                        lineNumber.className = 'stillmd-code-line-number';
+                        lineNumber.textContent = String(index + 1);
+                        gutter.appendChild(lineNumber);
+
+                        const lineRow = document.createElement('div');
+                        lineRow.className = 'stillmd-code-line';
+                        lineRow.dataset.stillmdCodeLine = 'true';
+
+                        const lineContent = document.createElement('span');
+                        lineContent.className = 'stillmd-code-line-content';
+                        if (!line) {
+                            lineContent.innerHTML = '&nbsp;';
+                        } else if (language && hljs.getLanguage(language)) {
+                            lineContent.innerHTML = hljs.highlight(line, { language: language }).value;
+                        } else {
+                            lineContent.innerHTML = escapeHTML(line);
+                        }
+
+                        lineRow.appendChild(lineContent);
+                        linesContainer.appendChild(lineRow);
+                    });
+
+                    block.appendChild(gutter);
+                    block.appendChild(linesContainer);
+                    pre.replaceWith(block);
+                }
+
+                function decorateCodeBlocks() {
+                    const codeBlocks = contentElement.querySelectorAll('pre > code');
+                    for (const codeElement of codeBlocks) {
+                        renderCodeBlock(codeElement);
+                    }
+                }
+
+                function clearDocumentLineNumbers() {
+                    documentLineNumberColumn.replaceChildren();
+                    document.documentElement.style.setProperty('--document-line-number-gutter-width', '0px');
+                }
+
+                function scheduleDocumentLineNumberLayout() {
+                    if (!viewerState.documentLineNumbersVisible) {
+                        clearDocumentLineNumbers();
+                        return;
+                    }
+
+                    if (documentLineNumberLayoutPending) {
+                        return;
+                    }
+
+                    documentLineNumberLayoutPending = true;
+                    requestAnimationFrame(() => {
+                        documentLineNumberLayoutPending = false;
+                        layoutDocumentLineNumbers();
+                    });
+                }
+
+                function layoutDocumentLineNumbers() {
+                    if (!viewerState.documentLineNumbersVisible) {
+                        clearDocumentLineNumbers();
+                        return;
+                    }
+
+                    const bodyRect = document.body.getBoundingClientRect();
+                    const candidates = contentElement.querySelectorAll(
+                        'h1, h2, h3, h4, h5, h6, p, li, tr, hr, .stillmd-code-line'
+                    );
+                    const rows = [];
+                    let lineNumber = 1;
+
+                    for (const candidate of candidates) {
+                        if (candidate.tagName === 'P' && candidate.closest('li')) {
+                            continue;
+                        }
+
+                        if (candidate.tagName === 'LI' && candidate.querySelector('p, .stillmd-code-line')) {
+                            continue;
+                        }
+
+                        const range = document.createRange();
+                        range.selectNodeContents(candidate);
+                        let rects = Array.from(range.getClientRects()).filter((rect) => {
+                            return rect.width > 0 && rect.height > 0;
+                        });
+
+                        if (!rects.length) {
+                            const fallbackRect = candidate.getBoundingClientRect();
+                            if (fallbackRect.width > 0 || fallbackRect.height > 0) {
+                                rects = [fallbackRect];
+                            }
+                        }
+
+                        for (const rect of rects) {
+                            const row = document.createElement('div');
+                            row.className = 'document-line-number';
+                            row.textContent = String(lineNumber++);
+                            row.style.top = `${rect.top - bodyRect.top}px`;
+                            row.style.height = `${Math.max(rect.height, 1)}px`;
+                            rows.push(row);
+                        }
+                    }
+
+                    documentLineNumberColumn.replaceChildren(...rows);
+                    const digits = String(Math.max(1, lineNumber - 1)).length;
+                    document.documentElement.style.setProperty(
+                        '--document-line-number-gutter-width',
+                        `${Math.max(2, digits + 1)}ch`
+                    );
+                }
 
                 function renderMarkdown(source) {
                     contentElement.innerHTML = marked.parse(source);
-                    hljs.highlightAll();
+                    decorateCodeBlocks();
                     if (viewerState.findQuery) {
                         highlightMatches(viewerState.findQuery, true);
                     } else {
                         publishFindResults();
                     }
+                    scheduleDocumentLineNumberLayout();
                 }
 
                 function publishFindResults() {
@@ -198,6 +358,7 @@ enum HTMLTemplate {
                         : 0;
 
                     updateActiveFindMatch(true);
+                    scheduleDocumentLineNumberLayout();
                 }
 
                 function updateFindQuery(query) {
@@ -218,6 +379,7 @@ enum HTMLTemplate {
                     }
 
                     updateActiveFindMatch(true);
+                    scheduleDocumentLineNumberLayout();
                 }
 
                 function applyTheme() {
@@ -234,11 +396,22 @@ enum HTMLTemplate {
                 function setThemePreference(nextThemePreference) {
                     viewerState.themePreference = nextThemePreference || 'system';
                     applyTheme();
+                    scheduleDocumentLineNumberLayout();
                 }
 
                 function setTextScale(nextTextScale) {
                     const clampedScale = Math.min(Math.max(nextTextScale, 0.85), 1.30);
                     document.documentElement.style.setProperty('--text-scale', clampedScale);
+                    scheduleDocumentLineNumberLayout();
+                }
+
+                function setDocumentLineNumbersVisible(nextVisible) {
+                    viewerState.documentLineNumbersVisible = !!nextVisible;
+                    if (!viewerState.documentLineNumbersVisible) {
+                        clearDocumentLineNumbers();
+                        return;
+                    }
+                    scheduleDocumentLineNumberLayout();
                 }
 
                 // Intercept external link clicks
@@ -264,6 +437,7 @@ enum HTMLTemplate {
                 mediaQuery.addEventListener('change', updateTheme);
                 setThemePreference(initialThemePreference);
                 setTextScale(initialTextScale);
+                setDocumentLineNumbersVisible(initialDocumentLineNumbersVisible);
 
                 let scrollState = { pending: false };
                 function reportScroll() {
@@ -293,6 +467,13 @@ enum HTMLTemplate {
                     renderMarkdown(md);
                     restoreScrollPosition(targetScrollY);
                 }
+
+                const resizeObserver = new ResizeObserver(() => {
+                    scheduleDocumentLineNumberLayout();
+                });
+                resizeObserver.observe(contentElement);
+                resizeObserver.observe(document.body);
+                window.addEventListener('resize', scheduleDocumentLineNumberLayout);
 
                 renderMarkdown(md);
                 restoreScrollPosition(initialScrollY);

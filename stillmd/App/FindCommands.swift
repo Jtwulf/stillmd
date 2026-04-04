@@ -4,7 +4,11 @@ struct FindAction {
     let perform: () -> Void
 }
 
-private struct ShowFindBarActionKey: FocusedValueKey {
+private struct ToggleFindBarActionKey: FocusedValueKey {
+    typealias Value = FindAction
+}
+
+private struct ToggleDocumentLineNumbersActionKey: FocusedValueKey {
     typealias Value = FindAction
 }
 
@@ -17,9 +21,14 @@ private struct FindPreviousActionKey: FocusedValueKey {
 }
 
 extension FocusedValues {
-    var showFindBarAction: FindAction? {
-        get { self[ShowFindBarActionKey.self] }
-        set { self[ShowFindBarActionKey.self] = newValue }
+    var toggleFindBarAction: FindAction? {
+        get { self[ToggleFindBarActionKey.self] }
+        set { self[ToggleFindBarActionKey.self] = newValue }
+    }
+
+    var toggleDocumentLineNumbersAction: FindAction? {
+        get { self[ToggleDocumentLineNumbersActionKey.self] }
+        set { self[ToggleDocumentLineNumbersActionKey.self] = newValue }
     }
 
     var findNextAction: FindAction? {
@@ -34,7 +43,8 @@ extension FocusedValues {
 }
 
 struct FindCommands: Commands {
-    @FocusedValue(\.showFindBarAction) private var showFindBarAction
+    @FocusedValue(\.toggleFindBarAction) private var toggleFindBarAction
+    @FocusedValue(\.toggleDocumentLineNumbersAction) private var toggleDocumentLineNumbersAction
     @FocusedValue(\.findNextAction) private var findNextAction
     @FocusedValue(\.findPreviousAction) private var findPreviousAction
 
@@ -42,10 +52,16 @@ struct FindCommands: Commands {
         CommandGroup(after: .textEditing) {
             Divider()
             Button("Find…") {
-                showFindBarAction?.perform()
+                toggleFindBarAction?.perform()
             }
             .keyboardShortcut("f", modifiers: .command)
-            .disabled(showFindBarAction == nil)
+            .disabled(toggleFindBarAction == nil)
+
+            Button("Line Numbers") {
+                toggleDocumentLineNumbersAction?.perform()
+            }
+            .keyboardShortcut("b", modifiers: .command)
+            .disabled(toggleDocumentLineNumbersAction == nil)
 
             Button("Find Next") {
                 findNextAction?.perform()

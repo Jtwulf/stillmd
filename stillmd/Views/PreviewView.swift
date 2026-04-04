@@ -15,6 +15,7 @@ struct PreviewView: View {
     @State private var findRequest: FindRequest?
     @State private var findRequestID = 0
     @State private var isFindBarChromeReserved = false
+    @State private var isDocumentLineNumbersPresented = false
     @State private var pendingFindResetTask: Task<Void, Never>?
 
     init(fileURL: URL, windowManager: WindowManager) {
@@ -56,8 +57,12 @@ struct PreviewView: View {
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
             handleDrop(providers)
         }
-        .focusedValue(\.showFindBarAction, FindAction(perform: presentFindBar))
-        .focusedValue(\.findNextAction, FindAction(perform: {
+        .focusedSceneValue(\.toggleFindBarAction, FindAction(perform: toggleFindBar))
+        .focusedSceneValue(
+            \.toggleDocumentLineNumbersAction,
+            FindAction(perform: toggleDocumentLineNumbers)
+        )
+        .focusedSceneValue(\.findNextAction, FindAction(perform: {
             if !isFindBarPresented {
                 presentFindBar()
                 return
@@ -86,6 +91,7 @@ struct PreviewView: View {
                 scrollPosition: $viewModel.scrollPosition,
                 themePreference: themePreference,
                 textScale: AppPreferences.clampedTextScale(textScale),
+                documentLineNumbersVisible: isDocumentLineNumbersPresented,
                 findQuery: findQuery,
                 findRequest: findRequest,
                 findStatus: $findStatus
@@ -138,6 +144,14 @@ struct PreviewView: View {
         return true
     }
 
+    private func toggleFindBar() {
+        if isFindBarPresented {
+            dismissFindBar()
+        } else {
+            presentFindBar()
+        }
+    }
+
     private func presentFindBar() {
         guard !isFindBarPresented else { return }
         pendingFindResetTask?.cancel()
@@ -154,6 +168,10 @@ struct PreviewView: View {
             isFindBarPresented = false
         }
         scheduleFindReset()
+    }
+
+    private func toggleDocumentLineNumbers() {
+        isDocumentLineNumbersPresented.toggle()
     }
 
     private func triggerFind(_ direction: FindDirection) {

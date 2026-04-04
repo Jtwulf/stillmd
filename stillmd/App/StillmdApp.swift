@@ -10,6 +10,7 @@ enum WindowDefaults {
 
 @main
 struct StillmdApp: App {
+    private static let blankWindowID = "blank"
 
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @AppStorage(AppPreferences.themeKey) private var themePreferenceRawValue =
@@ -19,19 +20,41 @@ struct StillmdApp: App {
         ThemePreference(rawValue: themePreferenceRawValue) ?? .system
     }
 
+    private var windowManager: WindowManager {
+        appDelegate.windowManager
+    }
+
     var body: some Scene {
         Settings {
             SettingsView()
                 .preferredColorScheme(themePreference.colorScheme)
         }
         .commands {
+            FileCommands(blankWindowID: Self.blankWindowID, windowManager: windowManager)
             FindCommands()
-            CommandGroup(replacing: .newItem) {
-                Button("Open…") {
-                    appDelegate.windowManager.showOpenPanel()
-                }
-                .keyboardShortcut("o", modifiers: .command)
-            }
+            TextScaleCommands()
+        }
+        .restorationBehavior(.disabled)
+        .defaultSize(
+            width: WindowDefaults.defaultWidth,
+            height: WindowDefaults.defaultHeight
+        )
+
+        WindowGroup("stillmd", id: Self.blankWindowID) {
+            BlankRootView(
+                windowManager: windowManager,
+                pendingFileOpenCoordinator: appDelegate.pendingFileOpenCoordinator
+            )
+            .preferredColorScheme(themePreference.colorScheme)
+            .frame(
+                minWidth: WindowDefaults.minimumWidth,
+                minHeight: WindowDefaults.minimumHeight
+            )
+        }
+        .commands {
+            FileCommands(blankWindowID: Self.blankWindowID, windowManager: windowManager)
+            FindCommands()
+            TextScaleCommands()
         }
     }
 }
