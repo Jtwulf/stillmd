@@ -468,6 +468,7 @@ struct HTMLTemplateUnitTests {
         let html = buildHTML(from: "test")
         #expect(html.contains("documentLineNumberOverlay.getBoundingClientRect"))
         #expect(html.contains("classList.contains('stillmd-code-line')"))
+        #expect(html.contains("rectsForDocumentLineCandidate"))
         #expect(html.contains("rowRects"))
     }
 

@@ -223,45 +223,50 @@ enum HTMLTemplate {
                     const candidates = contentElement.querySelectorAll(
                         'h1, h2, h3, h4, h5, h6, p, li, tr, hr, .stillmd-code-line'
                     );
-                    const rowRects = [];
 
-                    for (const candidate of candidates) {
+                    function rectsForDocumentLineCandidate(candidate) {
                         if (candidate.tagName === 'LI' && candidate.querySelector('p, .stillmd-code-line')) {
-                            continue;
+                            return [];
                         }
-
-                        let rects;
                         if (candidate.classList && candidate.classList.contains('stillmd-code-line')) {
                             const box = candidate.getBoundingClientRect();
-                            rects = box.width > 0 || box.height > 0 ? [box] : [];
-                        } else {
-                            const range = document.createRange();
-                            range.selectNodeContents(candidate);
-                            rects = Array.from(range.getClientRects()).filter((rect) => {
-                                return rect.width > 0 && rect.height > 0;
-                            });
-                            if (!rects.length) {
-                                const fallbackRect = candidate.getBoundingClientRect();
-                                if (fallbackRect.width > 0 || fallbackRect.height > 0) {
-                                    rects = [fallbackRect];
-                                }
+                            return box.width > 0 || box.height > 0 ? [box] : [];
+                        }
+                        const range = document.createRange();
+                        range.selectNodeContents(candidate);
+                        let rects = Array.from(range.getClientRects()).filter((rect) => {
+                            return rect.width > 0 && rect.height > 0;
+                        });
+                        if (!rects.length) {
+                            const fallbackRect = candidate.getBoundingClientRect();
+                            if (fallbackRect.width > 0 || fallbackRect.height > 0) {
+                                rects = [fallbackRect];
                             }
                         }
+                        return rects;
+                    }
 
-                        for (const rect of rects) {
+                    let totalLines = 0;
+                    for (const candidate of candidates) {
+                        totalLines += rectsForDocumentLineCandidate(candidate).length;
+                    }
+
+                    const digits = String(Math.max(1, totalLines)).length;
+                    document.documentElement.style.setProperty(
+                        '--document-line-number-gutter-width',
+                        `${Math.max(2, digits + 1)}ch`
+                    );
+                    void contentElement.offsetWidth;
+
+                    const rowRects = [];
+                    for (const candidate of candidates) {
+                        for (const rect of rectsForDocumentLineCandidate(candidate)) {
                             rowRects.push({
                                 top: rect.top,
                                 height: Math.max(rect.height, 1),
                             });
                         }
                     }
-
-                    const totalLines = rowRects.length;
-                    const digits = String(Math.max(1, totalLines)).length;
-                    document.documentElement.style.setProperty(
-                        '--document-line-number-gutter-width',
-                        `${Math.max(2, digits + 1)}ch`
-                    );
 
                     const overlayRect = documentLineNumberOverlay.getBoundingClientRect();
                     const contentRect = contentElement.getBoundingClientRect();
