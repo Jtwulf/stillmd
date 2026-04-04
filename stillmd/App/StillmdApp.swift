@@ -42,6 +42,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let pendingFileOpenCoordinator = PendingFileOpenCoordinator()
     let windowManager = WindowManager()
 
+    private var livingDocumentWindows: [StillmdDocumentWindow] = []
+
+    func trackDocumentWindow(_ window: StillmdDocumentWindow) {
+        livingDocumentWindows.append(window)
+    }
+
+    func untrackDocumentWindow(_ window: StillmdDocumentWindow) {
+        livingDocumentWindows.removeAll { $0 === window }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
 

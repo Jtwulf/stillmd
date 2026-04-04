@@ -29,6 +29,9 @@ final class StillmdDocumentWindow: NSWindow, NSWindowDelegate {
             defer: false
         )
 
+        // Swift/ARC: avoid pairing default `true` with a discarded local reference from the factory.
+        isReleasedWhenClosed = false
+
         delegate = self
         minSize = NSSize(width: WindowDefaults.minimumWidth, height: WindowDefaults.minimumHeight)
 
@@ -57,6 +60,11 @@ final class StillmdDocumentWindow: NSWindow, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         chromeController.teardown()
+        // `NSWindowDelegate` に `windowDidClose` が無いため、クローズ処理の後に非同期で参照を外す。
+        let window = self
+        DispatchQueue.main.async {
+            (NSApplication.shared.delegate as? AppDelegate)?.untrackDocumentWindow(window)
+        }
     }
 
     required init?(coder: NSCoder) {
@@ -71,10 +79,12 @@ enum DocumentWindowFactory {
         windowManager: WindowManager,
         pendingCoordinator: PendingFileOpenCoordinator
     ) {
-        _ = StillmdDocumentWindow(
+        let window = StillmdDocumentWindow(
             initialFileURL: initialURL,
             windowManager: windowManager,
             pendingCoordinator: pendingCoordinator
         )
+        guard let appDelegate = NSApplication.shared.delegate as? AppDelegate else { return }
+        appDelegate.trackDocumentWindow(window)
     }
 }
