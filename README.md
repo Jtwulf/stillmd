@@ -4,7 +4,7 @@
   <img src="assets/app-icon/stillmd-icon.png" alt="stillmd icon" width="160" />
 </p>
 
-A quiet, preview-only Markdown viewer for macOS.
+A quiet, still Markdown viewer for macOS.
 
 stillmd is built for reading Markdown, not managing it. It opens local `.md` and `.markdown` files, follows changes on disk, and stays out of the way.
 
@@ -39,35 +39,6 @@ stillmd is built for reading Markdown, not managing it. It opens local `.md` and
 3. Move `stillmd.app` into `/Applications` or another folder you prefer.
 
 The app is distributed without Developer ID signing and notarization.
-
-If macOS blocks the first launch:
-
-1. Control-click `stillmd.app`.
-2. Choose `Open`.
-3. Confirm the dialog.
-
-You may also need to allow it in System Settings > Privacy & Security.
-
-### Build From Source
-
-```bash
-swift build
-swift test
-./scripts/build-app.sh
-```
-
-## Internal Docs
-
-- [DESIGN.md](DESIGN.md)
-- [`docs/rules/`](docs/rules/)
-
-## Contributing
-
-Issues and pull requests are welcome. Before opening a PR, keep the app preview-only and run `swift build` and `swift test`.
-
-## Security
-
-If you found a security issue, please read [.github/SECURITY.md](.github/SECURITY.md) before filing anything publicly.
 
 ## License
 
