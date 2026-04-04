@@ -2,10 +2,12 @@
 
 ## 読了ルール（必須）
 
-このプロジェクトのルールファイルを読み込んだ場合、作業開始時に以下を**必ず**応答に含めてください：
+このプロジェクトのルールファイルを読み込んだ場合、通常の会話形式の応答では以下を**必ず**応答に含めてください：
 
 - 読み込んだファイルごとに `"[読了] ファイルパス"` と表示する
 - 例: `"[読了] docs/rules/00-overview.md"`
+
+JSON、コードのみ、その他 machine-parsed な厳密出力が要求される場合は、この表示を省略してよい。
 
 ## プロダクトの定義
 
@@ -48,4 +50,3 @@ stillmd は、macOS 向けの軽量な preview-only Markdown viewer である。
 - 性能: @docs/rules/04-performance.md
 - テスト: @docs/rules/05-testing.md
 - 文書運用: @docs/rules/06-doc-governance.md
-
