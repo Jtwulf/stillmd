@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import AppKit
+import WebKit
 @testable import stillmd
 
 private enum StillmdHTMLTestHelpers {
@@ -17,6 +18,88 @@ private enum StillmdHTMLTestHelpers {
         let b64 = String(b64Chars)
         guard let data = Data(base64Encoded: b64) else { return nil }
         return String(data: data, encoding: .utf8)
+    }
+}
+
+@MainActor
+private final class WKNavigationProbe: NSObject, WKNavigationDelegate {
+    struct TimeoutError: Error {}
+
+    private var continuation: CheckedContinuation<Void, Error>?
+    private var timeoutTask: Task<Void, Never>?
+
+    func loadHTML(
+        in webView: WKWebView,
+        html: String,
+        baseURL: URL?
+    ) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            self.continuation = continuation
+            timeoutTask?.cancel()
+            timeoutTask = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(10))
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    guard let self, let continuation = self.continuation else { return }
+                    self.continuation = nil
+                    continuation.resume(throwing: TimeoutError())
+                }
+            }
+            webView.navigationDelegate = self
+            webView.loadHTMLString(html, baseURL: baseURL)
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        timeoutTask?.cancel()
+        timeoutTask = nil
+        continuation?.resume()
+        continuation = nil
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        didFailProvisionalNavigation navigation: WKNavigation!,
+        withError error: Error
+    ) {
+        timeoutTask?.cancel()
+        timeoutTask = nil
+        continuation?.resume(throwing: error)
+        continuation = nil
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        timeoutTask?.cancel()
+        timeoutTask = nil
+        continuation?.resume(throwing: error)
+        continuation = nil
+    }
+}
+
+@MainActor
+private func evaluateJavaScriptInt(_ script: String, in webView: WKWebView) async throws -> Int {
+    try await withCheckedThrowingContinuation { continuation in
+        webView.evaluateJavaScript(script) { value, error in
+            if let error {
+                continuation.resume(throwing: error)
+                return
+            }
+            let intValue = (value as? NSNumber)?.intValue ?? 0
+            continuation.resume(returning: intValue)
+        }
+    }
+}
+
+@MainActor
+private func evaluateJavaScriptString(_ script: String, in webView: WKWebView) async throws -> String {
+    try await withCheckedThrowingContinuation { continuation in
+        webView.evaluateJavaScript(script) { value, error in
+            if let error {
+                continuation.resume(throwing: error)
+                return
+            }
+            continuation.resume(returning: value as? String ?? "")
+        }
     }
 }
 
@@ -272,19 +355,26 @@ struct HTMLTemplateUnitTests {
     @Test("Contains linkClicked message handler")
     func containsLinkClickedHandler() {
         let html = buildHTML(from: "test")
-        #expect(html.contains("window.webkit.messageHandlers.linkClicked"))
+        #expect(html.contains("const linkClickedHandler = messageHandlers.linkClicked ?? null;"))
     }
 
     @Test("Contains scrollPosition message handler")
     func containsScrollPositionHandler() {
         let html = buildHTML(from: "test")
-        #expect(html.contains("window.webkit.messageHandlers.scrollPosition"))
+        #expect(html.contains("const scrollHandler = messageHandlers.scrollPosition ?? null;"))
     }
 
     @Test("Contains findResults message handler")
     func containsFindResultsHandler() {
         let html = buildHTML(from: "test")
-        #expect(html.contains("window.webkit.messageHandlers.findResults"))
+        #expect(html.contains("const findResultsHandler = messageHandlers.findResults ?? null;"))
+    }
+
+    @Test("Message handlers are optional during initial render")
+    func messageHandlersAreOptional() {
+        let html = buildHTML(from: "test")
+        #expect(html.contains("const messageHandlers = window.webkit?.messageHandlers ?? {};"))
+        #expect(html.contains("function postMessageIfAvailable"))
     }
 
     // --- updateContent Function ---
@@ -345,6 +435,19 @@ struct HTMLTemplateUnitTests {
         #expect(html.contains("<script>\(sampleHighlightJS)</script>"))
     }
 
+    @Test("Injects base href when document base URL is provided")
+    func injectsBaseHref() {
+        let baseURL = URL(fileURLWithPath: "/Users/example/Doc's", isDirectory: true)
+        let html = HTMLTemplate.build(
+            markdownContent: "test",
+            markedJS: sampleMarkedJS,
+            highlightJS: sampleHighlightJS,
+            css: sampleCSS,
+            documentBaseURL: baseURL
+        )
+        #expect(html.contains("<base href=\"file:///Users/example/Doc&#39;s/\">"))
+    }
+
     @Test("Contains content div for rendering")
     func containsContentDiv() {
         let html = buildHTML(from: "test")
@@ -403,6 +506,72 @@ struct HTMLTemplateUnitTests {
         #expect(html.contains("function updateFindQuery"))
         #expect(html.contains("function navigateFind"))
         #expect(html.contains("mark.className = 'stillmd-find-match'"))
+    }
+}
+
+@Suite("WKWebView Configuration Unit Tests")
+@MainActor
+struct WKWebViewConfigurationUnitTests {
+
+    @Test("Content JavaScript is explicitly enabled")
+    func contentJavaScriptEnabled() {
+        let userContentController = WKUserContentController()
+        let configuration = StillmdWebViewConfiguration.make(
+            userContentController: userContentController
+        )
+
+        #expect(configuration.userContentController === userContentController)
+        #expect(configuration.defaultWebpagePreferences.allowsContentJavaScript)
+    }
+}
+
+@Suite("WKWebView Integration Tests")
+@MainActor
+struct WKWebViewIntegrationTests {
+
+    @Test("Inline HTML still renders markdown without registered message handlers")
+    func inlineHTMLRendersWithoutMessageHandlers() async throws {
+        let configuration = StillmdWebViewConfiguration.make(
+            userContentController: WKUserContentController()
+        )
+        let webView = WKWebView(
+            frame: NSRect(x: 0, y: 0, width: 640, height: 480),
+            configuration: configuration
+        )
+        let probe = WKNavigationProbe()
+        let html = HTMLTemplate.build(
+            markdownContent: "# Hello\n\nParagraph",
+            markedJS: ResourceLoader.loadMarkedJS(),
+            highlightJS: ResourceLoader.loadHighlightJS(),
+            css: ResourceLoader.loadCSS(),
+            documentBaseURL: URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
+        )
+
+        try await probe.loadHTML(
+            in: webView,
+            html: html,
+            baseURL: URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
+        )
+
+        let bootPhase = try await evaluateJavaScriptString("window.__stillmdBootPhase ?? ''", in: webView)
+        let lastError = try await evaluateJavaScriptString(
+            "window.__stillmdLastError ?? ''",
+            in: webView
+        )
+        #expect(bootPhase == "ready")
+        #expect(lastError.isEmpty)
+
+        let contentLength = try await evaluateJavaScriptInt(
+            "document.getElementById('content')?.innerHTML?.length ?? 0",
+            in: webView
+        )
+        #expect(contentLength > 0)
+
+        let headingCount = try await evaluateJavaScriptInt(
+            "document.querySelectorAll('h1').length",
+            in: webView
+        )
+        #expect(headingCount == 1)
     }
 }
 
