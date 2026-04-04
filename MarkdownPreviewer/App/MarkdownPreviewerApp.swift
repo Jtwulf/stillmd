@@ -22,7 +22,11 @@ struct MarkdownPreviewerApp: App {
 
     var body: some Scene {
         WindowGroup(for: URL.self) { $url in
-            RootView(fileURL: $url, windowManager: windowManager)
+            RootView(
+                fileURL: $url,
+                windowManager: windowManager,
+                pendingFileOpenCoordinator: appDelegate.pendingFileOpenCoordinator
+            )
                 .preferredColorScheme(themePreference.colorScheme)
                 .frame(
                     minWidth: WindowDefaults.minimumWidth,
@@ -60,14 +64,12 @@ struct MarkdownPreviewerApp: App {
 /// Handles Finder "Open With" / file double-click events.
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
-    /// URLs received before the first window's onAppear fires.
-    static var pendingURLs: [URL] = []
+    let pendingFileOpenCoordinator = PendingFileOpenCoordinator()
 
     func application(_ application: NSApplication, open urls: [URL]) {
         let mdURLs = urls.filter { FileValidation.isMarkdownFile($0) }
         guard !mdURLs.isEmpty else { return }
-        // Always queue — RootView.onAppear will consume them.
-        // This avoids creating a second window via openWindow().
-        AppDelegate.pendingURLs.append(contentsOf: mdURLs)
+
+        pendingFileOpenCoordinator.enqueue(mdURLs)
     }
 }

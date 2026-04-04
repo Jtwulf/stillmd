@@ -14,8 +14,8 @@
     --table-header-bg: #f6f4ee;
     --hr-color: #e6e1d6;
     --task-checkbox-border: #8a8f97;
-    --find-match-bg: rgba(196, 168, 92, 0.26);
-    --find-match-active-bg: rgba(196, 148, 55, 0.46);
+    --find-match-bg: rgba(255, 224, 130, 0.38);
+    --find-match-active-bg: rgba(255, 198, 65, 0.52);
 }
 
 [data-theme="dark"] {
@@ -34,8 +34,8 @@
     --table-header-bg: #1d2024;
     --hr-color: #2a2d32;
     --task-checkbox-border: #9197a0;
-    --find-match-bg: rgba(175, 145, 69, 0.28);
-    --find-match-active-bg: rgba(206, 162, 62, 0.54);
+    --find-match-bg: rgba(255, 206, 102, 0.24);
+    --find-match-active-bg: rgba(255, 180, 55, 0.42);
 }
 
 * {
