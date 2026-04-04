@@ -1,0 +1,103 @@
+import Foundation
+
+final class FileWatcher: @unchecked Sendable {
+    enum Event {
+        case modified
+        case deleted
+    }
+
+    private let url: URL
+    private let callback: (Event) -> Void
+    private var source: DispatchSourceFileSystemObject?
+    private var fileDescriptor: Int32 = -1
+    private let retryDelay: TimeInterval = 0.1
+    private let maxRetries: Int = 3
+
+    init(url: URL, callback: @escaping (Event) -> Void) {
+        self.url = url
+        self.callback = callback
+    }
+
+    func start() {
+        fileDescriptor = open(url.path, O_EVTONLY)
+        guard fileDescriptor >= 0 else {
+            callback(.deleted)
+            return
+        }
+
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fileDescriptor,
+            eventMask: [.write, .delete, .rename],
+            queue: .global(qos: .utility)
+        )
+
+        source.setEventHandler { [weak self] in
+            guard let self else { return }
+            let flags = source.data
+            if flags.contains(.delete) || flags.contains(.rename) {
+                self.handleDeleteOrRename()
+            } else if flags.contains(.write) {
+                self.handleWrite()
+            }
+        }
+
+        // No cancel handler that closes fd — we close fd synchronously in stop()
+        // to avoid race conditions when stop() + start() are called in sequence.
+
+        source.resume()
+        self.source = source
+    }
+
+    func stop() {
+        source?.cancel()
+        source = nil
+        if fileDescriptor >= 0 {
+            close(fileDescriptor)
+            fileDescriptor = -1
+        }
+    }
+
+    private func handleWrite() {
+        readWithRetry(attempt: 0)
+    }
+
+    private func readWithRetry(attempt: Int) {
+        if FileManager.default.isReadableFile(atPath: url.path) {
+            callback(.modified)
+        } else if attempt < maxRetries {
+            DispatchQueue.global().asyncAfter(deadline: .now() + retryDelay) {
+                self.readWithRetry(attempt: attempt + 1)
+            }
+        } else {
+            callback(.deleted)
+        }
+    }
+
+    private func handleDeleteOrRename() {
+        // Editors often save by renaming the file away and recreating it.
+        // Wait briefly then re-check existence. Use multiple retries for
+        // slower save operations.
+        retryRestart(attempt: 0, maxAttempts: 5, delay: 0.2)
+    }
+
+    private func retryRestart(attempt: Int, maxAttempts: Int, delay: TimeInterval) {
+        DispatchQueue.global().asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self else { return }
+            if FileManager.default.fileExists(atPath: self.url.path) {
+                // File was re-created — restart monitoring
+                self.stop()
+                self.start()
+                self.callback(.modified)
+            } else if attempt < maxAttempts {
+                // File not yet recreated — retry with increasing delay
+                self.retryRestart(attempt: attempt + 1, maxAttempts: maxAttempts, delay: delay)
+            } else {
+                self.callback(.deleted)
+            }
+        }
+    }
+
+    deinit {
+        stop()
+    }
+}
