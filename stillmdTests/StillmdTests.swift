@@ -214,6 +214,56 @@ struct PendingFileOpenCoordinatorUnitTests {
     }
 }
 
+@Suite("LaunchOpenRequestCoordinator Unit Tests")
+@MainActor
+struct LaunchOpenRequestCoordinatorUnitTests {
+
+    @Test("enqueue preserves order and exposes initial plus remaining URLs")
+    func enqueuePreservesOrder() {
+        let coordinator = LaunchOpenRequestCoordinator()
+        let url1 = URL(fileURLWithPath: "/tmp/README.md")
+        let url2 = URL(fileURLWithPath: "/tmp/NOTES.markdown")
+
+        coordinator.enqueue([url1, url2])
+
+        let batch = coordinator.consumeBatch()
+
+        #expect(batch == LaunchOpenRequestBatch(
+            initialURL: url1.standardizedFileURL,
+            remainingURLs: [url2.standardizedFileURL]
+        ))
+        #expect(coordinator.consumeBatch() == nil)
+    }
+
+    @Test("enqueue deduplicates standardized URLs")
+    func enqueueDeduplicatesStandardizedURLs() {
+        let coordinator = LaunchOpenRequestCoordinator()
+        let url1 = URL(fileURLWithPath: "/tmp/./README.md")
+        let url2 = URL(fileURLWithPath: "/tmp/README.md")
+
+        coordinator.enqueue([url1, url2])
+
+        let batch = coordinator.consumeBatch()
+
+        #expect(batch == LaunchOpenRequestBatch(
+            initialURL: url1.standardizedFileURL,
+            remainingURLs: []
+        ))
+    }
+
+    @Test("hasPendingURLs reflects enqueue and consume state")
+    func hasPendingURLsTracksState() {
+        let coordinator = LaunchOpenRequestCoordinator()
+        #expect(!coordinator.hasPendingURLs)
+
+        coordinator.enqueue([URL(fileURLWithPath: "/tmp/file.md")])
+        #expect(coordinator.hasPendingURLs)
+
+        _ = coordinator.consumeBatch()
+        #expect(!coordinator.hasPendingURLs)
+    }
+}
+
 
 // MARK: - Task 2.3: Property Test — GFM Conversion Produces Non-Empty HTML (Property 4)
 // **Validates: Requirements 4.1**

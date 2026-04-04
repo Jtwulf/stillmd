@@ -45,7 +45,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let pendingFileOpenCoordinator = PendingFileOpenCoordinator()
     let windowManager = WindowManager()
 
+    private let launchOpenRequestCoordinator = LaunchOpenRequestCoordinator()
     private var livingDocumentWindows: [StillmdDocumentWindow] = []
+    private var didFinishLaunching = false
 
     func trackDocumentWindow(_ window: StillmdDocumentWindow) {
         livingDocumentWindows.append(window)
@@ -67,10 +69,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             )
         }
 
-        DocumentWindowFactory.openDocument(
-            windowManager: windowManager,
-            pendingCoordinator: pendingFileOpenCoordinator
-        )
+        didFinishLaunching = true
+
+        if !openPendingLaunchRequests() {
+            DocumentWindowFactory.openDocument(
+                windowManager: windowManager,
+                pendingCoordinator: pendingFileOpenCoordinator
+            )
+        }
 
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -89,6 +95,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let mdURLs = urls.filter { FileValidation.isMarkdownFile($0) }
         guard !mdURLs.isEmpty else { return }
 
+        if !didFinishLaunching {
+            launchOpenRequestCoordinator.enqueue(mdURLs)
+            return
+        }
+
         pendingFileOpenCoordinator.enqueue(mdURLs)
 
         // Without a document window, no `RootView` observes `pendingChangeID` to drain the queue.
@@ -99,5 +110,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 pendingCoordinator: pendingFileOpenCoordinator
             )
         }
+    }
+
+    @discardableResult
+    private func openPendingLaunchRequests() -> Bool {
+        guard let batch = launchOpenRequestCoordinator.consumeBatch() else { return false }
+
+        DocumentWindowFactory.openDocument(
+            initialURL: batch.initialURL,
+            windowManager: windowManager,
+            pendingCoordinator: pendingFileOpenCoordinator
+        )
+
+        for url in batch.remainingURLs {
+            windowManager.openFile(url)
+        }
+
+        return true
     }
 }
