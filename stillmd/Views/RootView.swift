@@ -9,7 +9,9 @@ struct RootView: View {
     @AppStorage(AppPreferences.themeKey) private var themePreferenceRawValue =
         ThemePreference.system.rawValue
 
-    @State private var isEmptyStatePresented = false
+    /// `EmptyStateView` は `isPresented == false` のとき不透明度 0 になる。初期 false のまま非同期で true にすると
+    /// 起動直後ずっと透明のまま白い `NSHostingView` だけが見える。
+    @State private var isEmptyStatePresented = true
     @State private var isDropTargeted = false
 
     private var themePreference: ThemePreference {
@@ -29,7 +31,11 @@ struct RootView: View {
             WindowSurfacePalette.background(for: resolvedColorScheme)
                 .ignoresSafeArea()
 
-            rootContent
+            VStack(spacing: 0) {
+                Color.clear.frame(height: 28)
+                rootContent
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .preferredColorScheme(themePreference.colorScheme)
@@ -39,7 +45,7 @@ struct RootView: View {
             } else if consumePendingURLs() {
                 isEmptyStatePresented = false
             } else {
-                revealEmptyStateIfNeeded()
+                isEmptyStatePresented = true
             }
             syncDocumentChrome()
         }
@@ -49,7 +55,7 @@ struct RootView: View {
             }
             syncDocumentChrome()
         }
-        .onChange(of: documentSession.fileURL) { _, _ in
+        .onChange(of: documentSession.fileURL?.path ?? "") { _, _ in
             syncDocumentChrome()
         }
         .onChange(of: themePreferenceRawValue) { _, _ in
@@ -91,21 +97,6 @@ struct RootView: View {
         )
     }
 
-    private func revealEmptyStateIfNeeded() {
-        Task { @MainActor in
-            await Task.yield()
-
-            if consumePendingURLs() {
-                isEmptyStatePresented = false
-                return
-            }
-
-            if !isEmptyStatePresented {
-                isEmptyStatePresented = true
-            }
-        }
-    }
-
     @discardableResult
     private func consumePendingURLs() -> Bool {
         let pendingURLs = pendingFileOpenCoordinator.drain()
@@ -130,6 +121,7 @@ struct RootView: View {
         if panel.runModal() == .OK, let url = panel.url {
             documentSession.fileURL = url
             isEmptyStatePresented = false
+            syncDocumentChrome()
         }
     }
 

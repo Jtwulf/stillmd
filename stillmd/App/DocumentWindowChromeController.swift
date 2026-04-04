@@ -29,48 +29,7 @@ private final class NotificationTokenBag: @unchecked Sendable {
     }
 }
 
-private struct TitlebarDocumentTitleView: View {
-    let title: String
-    let colorScheme: ColorScheme
-
-    var body: some View {
-        Text(title)
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .truncationMode(.middle)
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 2)
-            .background(WindowSurfacePalette.background(for: colorScheme))
-    }
-}
-
-@MainActor
-private final class StillmdDocumentTitleAccessoryController: NSTitlebarAccessoryViewController {
-    private let hostingView: NSHostingView<TitlebarDocumentTitleView>
-
-    init(title: String, colorScheme: ColorScheme) {
-        let root = TitlebarDocumentTitleView(title: title, colorScheme: colorScheme)
-        self.hostingView = NSHostingView(rootView: root)
-        super.init(nibName: nil, bundle: nil)
-        self.view = hostingView
-        layoutAttribute = .leading
-        fullScreenMinHeight = 28
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    func updateContent(title: String, colorScheme: ColorScheme) {
-        hostingView.rootView = TitlebarDocumentTitleView(title: title, colorScheme: colorScheme)
-        hostingView.invalidateIntrinsicContentSize()
-    }
-}
-
-/// Owns document-window chrome for a single `NSWindow`: structural settings, titlebar accessory, and lifecycle reapply.
+/// Owns document-window chrome for a single `NSWindow`: structural settings and lifecycle reapply.
 /// Invoked from `StillmdDocumentWindow` and `RootView` state changes — not from SwiftUI `updateNSView` churn.
 @MainActor
 final class DocumentWindowChromeController: NSObject {
@@ -78,8 +37,6 @@ final class DocumentWindowChromeController: NSObject {
     private weak var observedWindow: NSWindow?
     private let notificationObservers = NotificationTokenBag()
     private var lifecycleReapply: (() -> Void)?
-    private var documentTitleAccessory: StillmdDocumentTitleAccessoryController?
-    private weak var accessoryWindow: NSWindow?
     private var geometryReapplyWorkItem: DispatchWorkItem?
 
     private var latestTitle = ""
@@ -111,13 +68,6 @@ final class DocumentWindowChromeController: NSObject {
     func teardown() {
         cancelGeometryReapplyWorkItem()
         removeWindowLifecycleObservers()
-        if let accessory = documentTitleAccessory, let win = accessoryWindow,
-            let index = win.titlebarAccessoryViewControllers.firstIndex(where: { $0 === accessory })
-        {
-            win.removeTitlebarAccessoryViewController(at: index)
-        }
-        documentTitleAccessory = nil
-        accessoryWindow = nil
         window = nil
     }
 
@@ -138,9 +88,13 @@ final class DocumentWindowChromeController: NSObject {
 
     private func applyConfiguration(to window: NSWindow) {
         window.title = latestTitle
-        window.representedURL = nil
+        if let fileURL = latestFileURL {
+            window.representedURL = fileURL
+        } else {
+            window.representedURL = nil
+        }
         window.representedFilename = ""
-        window.titleVisibility = .hidden
+        window.titleVisibility = .visible
         window.titlebarAppearsTransparent = true
         window.styleMask.insert(.fullSizeContentView)
         window.backgroundColor = WindowSurfacePalette.nsBackground(for: latestColorScheme)
@@ -159,8 +113,6 @@ final class DocumentWindowChromeController: NSObject {
         } else {
             window.identifier = NSUserInterfaceItemIdentifier("stillmd.window")
         }
-
-        syncDocumentTitleAccessory(on: window, title: latestTitle, colorScheme: latestColorScheme)
     }
 
     private func startWindowLifecycleObserversIfNeeded(for window: NSWindow) {
@@ -234,31 +186,6 @@ final class DocumentWindowChromeController: NSObject {
         lifecycleReapply = nil
     }
 
-    private func syncDocumentTitleAccessory(on window: NSWindow, title: String, colorScheme: ColorScheme) {
-        if let accessory = documentTitleAccessory {
-            let attachedToCurrent = window.titlebarAccessoryViewControllers.contains(where: { $0 === accessory })
-            if !attachedToCurrent {
-                if let previous = accessoryWindow,
-                    let index = previous.titlebarAccessoryViewControllers.firstIndex(where: { $0 === accessory })
-                {
-                    previous.removeTitlebarAccessoryViewController(at: index)
-                }
-                documentTitleAccessory = nil
-                accessoryWindow = nil
-            }
-        }
-
-        if let accessory = documentTitleAccessory {
-            accessory.updateContent(title: title, colorScheme: colorScheme)
-            accessoryWindow = window
-            return
-        }
-
-        let accessory = StillmdDocumentTitleAccessoryController(title: title, colorScheme: colorScheme)
-        documentTitleAccessory = accessory
-        accessoryWindow = window
-        window.addTitlebarAccessoryViewController(accessory)
-    }
 }
 
 enum DocumentWindowChromeBootstrap {
