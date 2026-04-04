@@ -40,13 +40,11 @@ struct PreviewView: View {
         isFindBarChromeReserved || (viewModel.errorMessage != nil && shouldKeepPreviewVisible)
     }
 
-    private var previewRevealOpacity: Double {
-        reduceMotion ? 1 : (isPreviewRevealed ? 1 : 0)
-    }
+    /// Always visible: `schedulePreviewReveal` / `didCommit` / `onAppear` の順で `isPreviewRevealed` が false に戻る
+    /// レースがあり、不透明度 0 のまま固定されることがある（本文は読み込めているのに真っ白に見える）。
+    private var previewRevealOpacity: Double { 1 }
 
-    private var previewRevealOffset: CGFloat {
-        reduceMotion || isPreviewRevealed ? 0 : StillmdMotion.previewReveal.offsetY
-    }
+    private var previewRevealOffset: CGFloat { 0 }
 
     var body: some View {
         // Use a plain `VStack` instead of `safeAreaInset`: inside `NSHostingView` + fullSizeContentView,
@@ -63,9 +61,9 @@ struct PreviewView: View {
             // regardless of how the window was created (Finder, Dock, NSWorkspace, etc.)
             windowManager.registerFile(fileURL)
             viewModel.startWatching()
-            if !shouldKeepPreviewVisible {
-                schedulePreviewReveal()
-            }
+            // `shouldKeepPreviewVisible == true` のとき従来はここで schedule していなかったため、
+            // `didCommit` が来ない環境だと `isPreviewRevealed` が永遠に false のまま真っ白になる。
+            schedulePreviewReveal()
         }
         .onChange(of: shouldKeepPreviewVisible) { wasVisible, isVisible in
             if wasVisible, !isVisible {
@@ -110,24 +108,19 @@ struct PreviewView: View {
     private var corePreview: some View {
         Group {
             if shouldKeepPreviewVisible {
-                // `GeometryReader` defaults to min height in stacks; outer `frame(max…)` gives it a real size so
-                // `NSViewRepresentable` is not laid out with a zero proposal (blank white preview).
-                GeometryReader { proxy in
-                    MarkdownWebView(
-                        markdownContent: viewModel.markdownContent,
-                        baseURL: fileURL.deletingLastPathComponent(),
-                        scrollPosition: $viewModel.scrollPosition,
-                        themePreference: themePreference,
-                        textScale: AppPreferences.clampedTextScale(textScale),
-                        documentLineNumbersVisible: isDocumentLineNumbersPresented,
-                        findQuery: findQuery,
-                        findRequest: findRequest,
-                        findStatus: $findStatus,
-                        onInitialNavigationCommitted: onMarkdownWebViewInitialNavigationCommitted,
-                        onWillLoadWebContent: { schedulePreviewReveal() }
-                    )
-                    .frame(width: proxy.size.width, height: proxy.size.height)
-                }
+                MarkdownWebView(
+                    markdownContent: viewModel.markdownContent,
+                    baseURL: fileURL.deletingLastPathComponent(),
+                    scrollPosition: $viewModel.scrollPosition,
+                    themePreference: themePreference,
+                    textScale: AppPreferences.clampedTextScale(textScale),
+                    documentLineNumbersVisible: isDocumentLineNumbersPresented,
+                    findQuery: findQuery,
+                    findRequest: findRequest,
+                    findStatus: $findStatus,
+                    onInitialNavigationCommitted: onMarkdownWebViewInitialNavigationCommitted,
+                    onWillLoadWebContent: { schedulePreviewReveal() }
+                )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let error = viewModel.errorMessage {
                 ErrorView(message: error)

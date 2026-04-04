@@ -10,6 +10,7 @@ final class StillmdMarkdownWebContainerView: NSView {
     init(webView: WKWebView) {
         self.webView = webView
         super.init(frame: .zero)
+        wantsLayer = true
         autoresizingMask = [.width, .height]
         addSubview(webView)
         webView.autoresizingMask = [.width, .height]
@@ -53,8 +54,8 @@ struct MarkdownWebView: NSViewRepresentable {
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
-        // Opaque drawing avoids showing through to an unintended light layer when HTML is still loading.
         webView.setValue(true, forKey: "drawsBackground")
+        webView.wantsLayer = true
 
         let html = HTMLTemplate.build(
             markdownContent: markdownContent,
@@ -75,6 +76,20 @@ struct MarkdownWebView: NSViewRepresentable {
         context.coordinator.lastFindQuery = findQuery
 
         return StillmdMarkdownWebContainerView(webView: webView)
+    }
+
+    /// `NSHostingView` 経由だと提案サイズが 0×0 になり、WKWebView が真っ白になることがある。
+    func sizeThatFits(
+        _ proposal: ProposedViewSize,
+        nsView: StillmdMarkdownWebContainerView,
+        context: Context
+    ) -> CGSize? {
+        let floor = CGSize(width: 320, height: 240)
+        let r = proposal.replacingUnspecifiedDimensions(by: floor)
+        if r.width < 1 || r.height < 1 {
+            return floor
+        }
+        return r
     }
 
     func updateNSView(_ container: StillmdMarkdownWebContainerView, context: Context) {
@@ -171,6 +186,15 @@ struct MarkdownWebView: NSViewRepresentable {
         // MARK: - WKNavigationDelegate
 
         func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+            reportInitialNavigationIfNeeded()
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            // `loadHTMLString` では環境によって `didCommit` が期待どおり来ないことがあるためフォールバック。
+            reportInitialNavigationIfNeeded()
+        }
+
+        private func reportInitialNavigationIfNeeded() {
             guard !didReportInitialNavigationCommit else { return }
             didReportInitialNavigationCommit = true
             let callback = parent.onInitialNavigationCommitted
