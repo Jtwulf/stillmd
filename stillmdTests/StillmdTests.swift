@@ -838,7 +838,7 @@ struct FileModificationContentUpdatePropertyTests {
 struct WindowTitleMatchesFileNamePropertyTests {
 
     /// For any file URL, fileURL.lastPathComponent produces the expected filename.
-    /// This matches the window title string used by `WindowAccessor` / titlebar accessory.
+    /// This matches the window title string used by `DocumentWindowChromeController` / titlebar accessory.
     /// Generates 120 random file URLs with various filenames.
     @Test("Window title matches file name for 120 random file URLs")
     func windowTitleMatchesFileName() {

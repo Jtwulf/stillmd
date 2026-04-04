@@ -1,10 +1,10 @@
 import SwiftUI
 
 struct RootView: View {
-    @Binding var fileURL: URL?
+    @ObservedObject var documentSession: DocumentWindowSession
     @ObservedObject var windowManager: WindowManager
     @ObservedObject var pendingFileOpenCoordinator: PendingFileOpenCoordinator
-    @Environment(\.openWindow) private var openWindow
+    @Environment(\.documentChromeController) private var documentChromeController
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage(AppPreferences.themeKey) private var themePreferenceRawValue =
         ThemePreference.system.rawValue
@@ -21,7 +21,7 @@ struct RootView: View {
     }
 
     private var windowTitle: String {
-        fileURL?.lastPathComponent ?? "stillmd"
+        documentSession.fileURL?.lastPathComponent ?? "stillmd"
     }
 
     var body: some View {
@@ -31,44 +31,42 @@ struct RootView: View {
 
             rootContent
         }
-        .background(
-            WindowAccessor(
-                fileURL: fileURL?.standardizedFileURL,
-                title: windowTitle,
-                colorScheme: resolvedColorScheme,
-                windowManager: windowManager
-            )
-        )
+        .preferredColorScheme(themePreference.colorScheme)
         .onAppear {
-            windowManager.openWindowAction = openWindow
-
-            if fileURL != nil {
+            if documentSession.fileURL != nil {
                 isEmptyStatePresented = false
-                return
-            }
-
-            if consumePendingURLs() {
+            } else if consumePendingURLs() {
                 isEmptyStatePresented = false
-                return
+            } else {
+                revealEmptyStateIfNeeded()
             }
-
-            revealEmptyStateIfNeeded()
+            syncDocumentChrome()
         }
         .onChange(of: pendingFileOpenCoordinator.pendingChangeID) { _, _ in
             if consumePendingURLs() {
                 isEmptyStatePresented = false
             }
+            syncDocumentChrome()
+        }
+        .onChange(of: documentSession.fileURL) { _, _ in
+            syncDocumentChrome()
+        }
+        .onChange(of: themePreferenceRawValue) { _, _ in
+            syncDocumentChrome()
+        }
+        .onChange(of: colorScheme) { _, _ in
+            syncDocumentChrome()
         }
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
             handleDrop(providers)
         }
-        // Window title + chrome are driven by `WindowAccessor` on `NSWindow`.
+        // Window title + chrome are driven by `DocumentWindowChromeController` on `NSWindow`.
         // Avoid `.navigationTitle` here: it syncs with AppKit titlebar and can undo unified chrome.
     }
 
     @ViewBuilder
     private var rootContent: some View {
-        if let url = fileURL {
+        if let url = documentSession.fileURL {
             PreviewView(fileURL: url, windowManager: windowManager)
         } else {
             EmptyStateView(
@@ -79,6 +77,15 @@ struct RootView: View {
                 isPresented: isEmptyStatePresented
             )
         }
+    }
+
+    private func syncDocumentChrome() {
+        documentChromeController?.syncFromSwiftUI(
+            title: windowTitle,
+            colorScheme: resolvedColorScheme,
+            fileURL: documentSession.fileURL?.standardizedFileURL,
+            windowManager: windowManager
+        )
     }
 
     private func revealEmptyStateIfNeeded() {
@@ -102,8 +109,8 @@ struct RootView: View {
         guard !pendingURLs.isEmpty else { return false }
 
         var remainingURLs = pendingURLs
-        if fileURL == nil, let initialURL = remainingURLs.first {
-            fileURL = initialURL
+        if documentSession.fileURL == nil, let initialURL = remainingURLs.first {
+            documentSession.fileURL = initialURL
             remainingURLs.removeFirst()
         }
 
@@ -118,7 +125,7 @@ struct RootView: View {
         let panel = NSOpenPanel()
         FileValidation.configureOpenPanel(panel, allowsMultipleSelection: false)
         if panel.runModal() == .OK, let url = panel.url {
-            fileURL = url
+            documentSession.fileURL = url
             isEmptyStatePresented = false
         }
     }
@@ -128,8 +135,8 @@ struct RootView: View {
             _ = provider.loadObject(ofClass: URL.self) { url, _ in
                 guard let url, FileValidation.isMarkdownFile(url) else { return }
                 Task { @MainActor in
-                    if self.fileURL == nil {
-                        self.fileURL = url
+                    if self.documentSession.fileURL == nil {
+                        self.documentSession.fileURL = url
                     } else {
                         self.windowManager.openFile(url)
                     }

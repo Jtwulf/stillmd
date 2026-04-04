@@ -41,7 +41,7 @@ struct PreviewView: View {
             .safeAreaInset(edge: .top, spacing: 0) {
                 topChrome
             }
-        // Title is shown via `WindowAccessor` (titlebar accessory); avoid `.navigationTitle` fighting AppKit chrome.
+        // Title is shown via `DocumentWindowChromeController` (titlebar accessory); avoid `.navigationTitle` fighting AppKit chrome.
         .onAppear {
             // Register this file in WindowManager for duplicate detection,
             // regardless of how the window was created (Finder, Dock, NSWorkspace, etc.)
@@ -56,15 +56,15 @@ struct PreviewView: View {
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
             handleDrop(providers)
         }
-        .focusedSceneValue(\.showFindBarAction, FindAction(perform: presentFindBar))
-        .focusedSceneValue(\.findNextAction, FindAction(perform: {
+        .focusedValue(\.showFindBarAction, FindAction(perform: presentFindBar))
+        .focusedValue(\.findNextAction, FindAction(perform: {
             if !isFindBarPresented {
                 presentFindBar()
                 return
             }
             triggerFind(.next)
         }))
-        .focusedSceneValue(\.findPreviousAction, FindAction(perform: {
+        .focusedValue(\.findPreviousAction, FindAction(perform: {
             if !isFindBarPresented {
                 presentFindBar()
                 return

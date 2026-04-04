@@ -1,4 +1,5 @@
-import SwiftUI
+import AppKit
+import Foundation
 import UniformTypeIdentifiers
 
 private final class WeakWindowReference {
@@ -15,10 +16,10 @@ class WindowManager: ObservableObject {
     @Published private(set) var openFiles: Set<URL> = []
     private var windowsByURL: [URL: WeakWindowReference] = [:]
 
-    /// Stored reference to the active scene's `openWindow` action.
-    var openWindowAction: OpenWindowAction?
+    /// Opens a new document window for the given file URL (AppKit path via `DocumentWindowFactory`).
+    var openNewDocumentHandler: ((URL) -> Void)?
 
-    /// Test-only hook: called instead of `openWindowAction` when set.
+    /// Test-only hook: called instead of `openNewDocumentHandler` when set.
     var _testOpenWindowHandler: ((URL) -> Void)?
     var _testBringToFrontHandler: ((URL) -> Void)?
     var _registeredWindowCount: Int {
@@ -36,13 +37,11 @@ class WindowManager: ObservableObject {
         if let testHandler = _testOpenWindowHandler {
             testHandler(resolved)
             openFiles.insert(resolved)
-        } else if let action = openWindowAction {
-            action(value: resolved)
+        } else if let handler = openNewDocumentHandler {
+            handler(resolved)
             openFiles.insert(resolved)
         } else {
-            // Cold start fallback: openWindowAction not yet available.
-            // Use NSWorkspace to open the file, which triggers handlesExternalEvents
-            // and creates a new WindowGroup scene for the URL.
+            // Cold start fallback before `applicationDidFinishLaunching` wires the handler.
             NSWorkspace.shared.open(url)
         }
     }
