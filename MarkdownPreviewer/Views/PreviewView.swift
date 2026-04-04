@@ -28,47 +28,18 @@ struct PreviewView: View {
         viewModel.errorMessage == nil || !viewModel.markdownContent.isEmpty
     }
 
+    /// エラー帯または検索バー表示中のみインセット内に実コンテンツを置く（非表示時は高さ 0 でプレースホルダ）。
+    private var shouldShowTopChrome: Bool {
+        isFindBarPresented || (viewModel.errorMessage != nil && shouldKeepPreviewVisible)
+    }
+
     var body: some View {
-        Group {
-            if shouldKeepPreviewVisible {
-                MarkdownWebView(
-                    markdownContent: viewModel.markdownContent,
-                    baseURL: fileURL.deletingLastPathComponent(),
-                    scrollPosition: $viewModel.scrollPosition,
-                    themePreference: themePreference,
-                    textScale: AppPreferences.clampedTextScale(textScale),
-                    findQuery: findQuery,
-                    findRequest: findRequest,
-                    findStatus: $findStatus
-                )
-            } else if let error = viewModel.errorMessage {
-                ErrorView(message: error)
+        corePreview
+            .safeAreaInset(edge: .top, spacing: 0) {
+                topChrome
             }
-        }
         .navigationTitle(fileURL.lastPathComponent)
         .background(WindowAccessor(url: fileURL.standardizedFileURL))
-        .safeAreaInset(edge: .top, spacing: 0) {
-            VStack(spacing: 8) {
-                if let error = viewModel.errorMessage, shouldKeepPreviewVisible {
-                    InlineStatusBanner(message: error)
-                }
-
-                if isFindBarPresented {
-                    HStack {
-                        Spacer(minLength: 0)
-                        FindBar(
-                            query: $findQuery,
-                            status: findStatus,
-                            onPrevious: { triggerFind(.previous) },
-                            onNext: { triggerFind(.next) },
-                            onClose: dismissFindBar
-                        )
-                    }
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-        }
         .onAppear {
             // Register this file in WindowManager for duplicate detection,
             // regardless of how the window was created (Finder, Dock, NSWorkspace, etc.)
@@ -106,6 +77,51 @@ struct PreviewView: View {
         .onExitCommand {
             guard isFindBarPresented else { return }
             dismissFindBar()
+        }
+    }
+
+    @ViewBuilder
+    private var corePreview: some View {
+        if shouldKeepPreviewVisible {
+            MarkdownWebView(
+                markdownContent: viewModel.markdownContent,
+                baseURL: fileURL.deletingLastPathComponent(),
+                scrollPosition: $viewModel.scrollPosition,
+                themePreference: themePreference,
+                textScale: AppPreferences.clampedTextScale(textScale),
+                findQuery: findQuery,
+                findRequest: findRequest,
+                findStatus: $findStatus
+            )
+        } else if let error = viewModel.errorMessage {
+            ErrorView(message: error)
+        }
+    }
+
+    @ViewBuilder
+    private var topChrome: some View {
+        if shouldShowTopChrome {
+            VStack(alignment: .trailing, spacing: 8) {
+                if let error = viewModel.errorMessage, shouldKeepPreviewVisible {
+                    InlineStatusBanner(message: error)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if isFindBarPresented {
+                    FindBar(
+                        query: $findQuery,
+                        status: findStatus,
+                        onPrevious: { triggerFind(.previous) },
+                        onNext: { triggerFind(.next) },
+                        onClose: dismissFindBar
+                    )
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .background(Color.clear)
+        } else {
+            // インセット修飾子自体は常に同じビュー木に載せ、`MarkdownWebView` の再生成を避ける
+            Color.clear.frame(height: 0)
         }
     }
 

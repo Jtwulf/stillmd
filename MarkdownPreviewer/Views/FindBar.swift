@@ -40,7 +40,7 @@ struct FindBar: View {
 
             TextField("本文を検索", text: $query)
                 .textFieldStyle(.plain)
-                .frame(minWidth: 220)
+                .frame(minWidth: 200)
                 .focused($isFieldFocused)
                 .onSubmit(onNext)
 
@@ -62,25 +62,24 @@ struct FindBar: View {
             .disabled(query.isEmpty || status.matchCount == 0)
 
             Divider()
-                .frame(height: 14)
+                .frame(height: 12)
 
             Button(action: onClose) {
                 Image(systemName: "xmark")
             }
             .buttonStyle(.plain)
         }
-        .font(.system(size: 13))
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .font(.system(size: 12))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(Color(nsColor: .windowBackgroundColor))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
         .onAppear {
             isFieldFocused = true
         }
