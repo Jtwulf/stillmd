@@ -1,6 +1,6 @@
 # stillmd
 
-![stillmd icon](assets/app-icon/stillmd-icon.png)
+<img src="assets/app-icon/stillmd-icon.png" alt="stillmd icon" width="160" />
 
 A quiet, preview-only Markdown viewer for macOS.
 
