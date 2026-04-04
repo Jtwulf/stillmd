@@ -23,7 +23,10 @@ private enum StillmdHTMLTestHelpers {
 
 @MainActor
 private final class WKNavigationProbe: NSObject, WKNavigationDelegate {
+    struct TimeoutError: Error {}
+
     private var continuation: CheckedContinuation<Void, Error>?
+    private var timeoutTask: Task<Void, Never>?
 
     func loadHTML(
         in webView: WKWebView,
@@ -32,12 +35,24 @@ private final class WKNavigationProbe: NSObject, WKNavigationDelegate {
     ) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             self.continuation = continuation
+            timeoutTask?.cancel()
+            timeoutTask = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(10))
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    guard let self, let continuation = self.continuation else { return }
+                    self.continuation = nil
+                    continuation.resume(throwing: TimeoutError())
+                }
+            }
             webView.navigationDelegate = self
             webView.loadHTMLString(html, baseURL: baseURL)
         }
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        timeoutTask?.cancel()
+        timeoutTask = nil
         continuation?.resume()
         continuation = nil
     }
@@ -47,11 +62,15 @@ private final class WKNavigationProbe: NSObject, WKNavigationDelegate {
         didFailProvisionalNavigation navigation: WKNavigation!,
         withError error: Error
     ) {
+        timeoutTask?.cancel()
+        timeoutTask = nil
         continuation?.resume(throwing: error)
         continuation = nil
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        timeoutTask?.cancel()
+        timeoutTask = nil
         continuation?.resume(throwing: error)
         continuation = nil
     }
@@ -418,7 +437,7 @@ struct HTMLTemplateUnitTests {
 
     @Test("Injects base href when document base URL is provided")
     func injectsBaseHref() {
-        let baseURL = URL(fileURLWithPath: "/Users/example/Documents", isDirectory: true)
+        let baseURL = URL(fileURLWithPath: "/Users/example/Doc's", isDirectory: true)
         let html = HTMLTemplate.build(
             markdownContent: "test",
             markedJS: sampleMarkedJS,
@@ -426,7 +445,7 @@ struct HTMLTemplateUnitTests {
             css: sampleCSS,
             documentBaseURL: baseURL
         )
-        #expect(html.contains("<base href=\"\(baseURL.absoluteString)\">"))
+        #expect(html.contains("<base href=\"file:///Users/example/Doc&#39;s/\">"))
     }
 
     @Test("Contains content div for rendering")
