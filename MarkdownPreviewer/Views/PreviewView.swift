@@ -5,7 +5,6 @@ struct PreviewView: View {
     let fileURL: URL
     @ObservedObject var windowManager: WindowManager
     @StateObject private var viewModel: PreviewViewModel
-    @Environment(\.openWindow) private var openWindow
 
     init(fileURL: URL, windowManager: WindowManager) {
         self.fileURL = fileURL
@@ -27,8 +26,14 @@ struct PreviewView: View {
         }
         .navigationTitle(fileURL.lastPathComponent)
         .onAppear {
-            windowManager.openWindowAction = openWindow
             viewModel.startWatching()
+            // Set representedURL on the hosting NSWindow so WindowManager
+            // can identify windows by full URL instead of title alone.
+            DispatchQueue.main.async {
+                if let window = NSApp.windows.first(where: { $0.isKeyWindow }) {
+                    window.representedURL = fileURL.standardizedFileURL
+                }
+            }
         }
         .onDisappear {
             viewModel.stopWatching()

@@ -11,6 +11,7 @@ enum HTMLTemplate {
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "`", with: "\\`")
             .replacingOccurrences(of: "$", with: "\\$")
+            .replacingOccurrences(of: "</script>", with: "<\\/script>")
 
         return """
         <!DOCTYPE html>
@@ -18,6 +19,7 @@ enum HTMLTemplate {
         <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src file: data: https: http:;">
             <style>\(css)</style>
             <script>\(markedJS)</script>
             <script>\(highlightJS)</script>
@@ -25,6 +27,14 @@ enum HTMLTemplate {
         <body>
             <div id="content"></div>
             <script>
+                // Strip raw HTML blocks from markdown output for security.
+                // This prevents injected <img onerror=...>, <script>, javascript: links, etc.
+                marked.use({
+                    renderer: {
+                        html(token) { return ''; }
+                    }
+                });
+
                 // marked.js configuration: GFM enabled
                 marked.setOptions({
                     gfm: true,

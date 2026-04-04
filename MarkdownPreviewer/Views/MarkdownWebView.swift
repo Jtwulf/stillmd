@@ -41,6 +41,7 @@ struct MarkdownWebView: NSViewRepresentable {
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "`", with: "\\`")
             .replacingOccurrences(of: "$", with: "\\$")
+            .replacingOccurrences(of: "</script>", with: "<\\/script>")
 
         let js = "updateContent(`\(escaped)`);"
         webView.evaluateJavaScript(js)

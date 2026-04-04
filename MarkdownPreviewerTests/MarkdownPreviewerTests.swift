@@ -984,6 +984,7 @@ struct WindowCountEqualsDistinctFileCountPropertyTests {
 
         for iteration in 0..<120 {
             let wm = WindowManager()
+            wm._testOpenWindowHandler = { _ in }
 
             // Generate a random number of distinct file URLs (1-10)
             let fileCount = Int.random(in: 1...10)
@@ -1020,6 +1021,7 @@ struct WindowCountEqualsDistinctFileCountPropertyTests {
     func duplicateURLsDetectedViaContains() {
         for _ in 0..<120 {
             let wm = WindowManager()
+            wm._testOpenWindowHandler = { _ in }
             let depth = Int.random(in: 1...4)
             var pathParts: [String] = ["/"]
             let dirs = ["tmp", "Users", "home", "Documents", "Projects"]
@@ -1056,6 +1058,7 @@ struct WindowManagerUnitTests {
     @MainActor
     func openFileAddsURL() {
         let wm = WindowManager()
+        wm._testOpenWindowHandler = { _ in }
         let url = URL(fileURLWithPath: "/tmp/test-file.md")
 
         wm.openFile(url)
@@ -1071,6 +1074,7 @@ struct WindowManagerUnitTests {
     @MainActor
     func closeFileRemovesURL() {
         let wm = WindowManager()
+        wm._testOpenWindowHandler = { _ in }
         let url = URL(fileURLWithPath: "/tmp/test-file.md")
 
         wm.openFile(url)
@@ -1088,6 +1092,7 @@ struct WindowManagerUnitTests {
     @MainActor
     func duplicateURLDetectedInOpenFiles() {
         let wm = WindowManager()
+        wm._testOpenWindowHandler = { _ in }
         let url = URL(fileURLWithPath: "/tmp/test-file.md")
 
         wm.openFile(url)
@@ -1105,6 +1110,7 @@ struct WindowManagerUnitTests {
     @MainActor
     func differentURLsIncreaseCount() {
         let wm = WindowManager()
+        wm._testOpenWindowHandler = { _ in }
         let url1 = URL(fileURLWithPath: "/tmp/file1.md")
         let url2 = URL(fileURLWithPath: "/tmp/file2.md")
         let url3 = URL(fileURLWithPath: "/tmp/file3.markdown")
@@ -1137,6 +1143,7 @@ struct WindowManagerUnitTests {
     @MainActor
     func openAndCloseMultipleFiles() {
         let wm = WindowManager()
+        wm._testOpenWindowHandler = { _ in }
         let url1 = URL(fileURLWithPath: "/tmp/file1.md")
         let url2 = URL(fileURLWithPath: "/tmp/file2.md")
         let url3 = URL(fileURLWithPath: "/tmp/file3.md")
@@ -1159,6 +1166,7 @@ struct WindowManagerUnitTests {
     @MainActor
     func urlsAreStandardized() {
         let wm = WindowManager()
+        wm._testOpenWindowHandler = { _ in }
         // Both should resolve to the same standardized URL
         let url1 = URL(fileURLWithPath: "/tmp/./test.md")
         let url2 = URL(fileURLWithPath: "/tmp/test.md")

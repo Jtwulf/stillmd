@@ -6,8 +6,13 @@ class WindowManager: ObservableObject {
     /// Currently open file URLs (for duplicate detection).
     @Published private(set) var openFiles: Set<URL> = []
 
-    /// Stored reference to the openWindow action, set by the App entry point.
+    /// Stored reference to the openWindow action, set by the App entry point
+    /// via `OpenWindowInjector` before any file can be opened.
     var openWindowAction: OpenWindowAction?
+
+    /// Test-only hook: called instead of `openWindowAction` when set.
+    /// Allows unit tests to exercise openFile() without a real SwiftUI environment.
+    var _testOpenWindowHandler: ((URL) -> Void)?
 
     func openFile(_ url: URL) {
         let resolved = url.standardizedFileURL
@@ -15,8 +20,15 @@ class WindowManager: ObservableObject {
             bringToFront(resolved)
             return
         }
+
+        // In tests, use the test handler; in production, use the real action.
+        if let testHandler = _testOpenWindowHandler {
+            testHandler(resolved)
+        } else {
+            guard let action = openWindowAction else { return }
+            action(value: resolved)
+        }
         openFiles.insert(resolved)
-        openWindowAction?(value: resolved)
     }
 
     func closeFile(_ url: URL) {
@@ -40,8 +52,9 @@ class WindowManager: ObservableObject {
 
     private func bringToFront(_ url: URL) {
         for window in NSApp.windows {
-            // Match by window title (file name) — the title is set to lastPathComponent
-            if window.title == url.lastPathComponent {
+            // Match by representedURL (full file URL) for accurate identification
+            // when multiple files share the same basename.
+            if window.representedURL == url {
                 window.makeKeyAndOrderFront(nil)
                 return
             }
