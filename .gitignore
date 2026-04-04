@@ -1,6 +1,7 @@
 # Xcode
 DerivedData/
 build/
+dist/
 *.xcworkspace
 xcuserdata/
 
@@ -21,3 +22,6 @@ Package.resolved
 
 # Review artifacts
 .tmp_review/
+
+# Local tooling
+.serena/

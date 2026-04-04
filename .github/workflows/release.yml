@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-release:
+    runs-on: macos-15
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Show toolchain versions
+        run: |
+          sw_vers
+          swift --version
+          xcodebuild -version
+
+      - name: Build release archive
+        run: ./scripts/package-release.sh "${GITHUB_REF_NAME}"
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.zip
+            dist/*.sha256
+          body: |
+            - Built from tag `${{ github.ref_name }}`
+            - This release is currently unsigned and not notarized
+            - If macOS blocks the first launch, Control-click the app and choose `Open`
