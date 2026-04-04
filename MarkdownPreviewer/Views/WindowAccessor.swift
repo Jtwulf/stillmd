@@ -8,27 +8,34 @@ struct WindowAccessor: NSViewRepresentable {
     let colorScheme: ColorScheme
     @ObservedObject var windowManager: WindowManager
 
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.async {
-            updateWindow(from: view)
+            updateWindow(from: view, coordinator: context.coordinator)
         }
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
         DispatchQueue.main.async {
-            updateWindow(from: nsView)
+            updateWindow(from: nsView, coordinator: context.coordinator)
         }
     }
 
-    private func updateWindow(from view: NSView) {
+    private func updateWindow(from view: NSView, coordinator: Coordinator) {
         guard let window = view.window else { return }
+        coordinator.configurationSequence += 1
+        let sequence = coordinator.configurationSequence
 
         applyConfiguration(to: window)
 
         // SwiftUI may re-assert document metadata after the first pass.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            guard coordinator.configurationSequence == sequence else { return }
             applyConfiguration(to: window)
         }
     }
@@ -51,7 +58,14 @@ struct WindowAccessor: NSViewRepresentable {
         window.standardWindowButton(.documentVersionsButton)?.isHidden = true
 
         if let fileURL {
+            window.identifier = NSUserInterfaceItemIdentifier(fileURL.absoluteString)
             windowManager.registerWindow(window, for: fileURL)
+        } else {
+            window.identifier = NSUserInterfaceItemIdentifier("stillmd.window")
         }
+    }
+
+    final class Coordinator {
+        var configurationSequence = 0
     }
 }

@@ -88,7 +88,8 @@ class WindowManager: ObservableObject {
             return
         }
 
-        for window in NSApp.windows where window.representedURL == url {
+        let windowIdentifier = NSUserInterfaceItemIdentifier(url.absoluteString)
+        for window in NSApp.windows where window.identifier == windowIdentifier {
             NSApp.activate(ignoringOtherApps: true)
             window.makeKeyAndOrderFront(nil)
             return
