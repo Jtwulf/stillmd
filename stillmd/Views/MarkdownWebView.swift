@@ -105,7 +105,7 @@ struct MarkdownWebView: NSViewRepresentable {
             documentLineNumbersVisible: documentLineNumbersVisible,
             documentBaseURL: baseURL
         )
-        webView.loadHTMLString(html, baseURL: nil)
+        webView.loadHTMLString(html, baseURL: baseURL)
 
         context.coordinator.lastContent = markdownContent
         context.coordinator.lastThemePreference = themePreference.rawValue

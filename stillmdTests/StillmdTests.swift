@@ -528,7 +528,11 @@ struct WKWebViewIntegrationTests {
             documentBaseURL: URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
         )
 
-        try await probe.loadHTML(in: webView, html: html, baseURL: nil)
+        try await probe.loadHTML(
+            in: webView,
+            html: html,
+            baseURL: URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
+        )
 
         let bootPhase = try await evaluateJavaScriptString("window.__stillmdBootPhase ?? ''", in: webView)
         let lastError = try await evaluateJavaScriptString(
