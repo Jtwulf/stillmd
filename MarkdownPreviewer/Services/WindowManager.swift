@@ -6,8 +6,7 @@ class WindowManager: ObservableObject {
     /// Currently open file URLs (for duplicate detection).
     @Published private(set) var openFiles: Set<URL> = []
 
-    /// Stored reference to the openWindow action, set by the App entry point
-    /// via `OpenWindowInjector` before any file can be opened.
+    /// Stored reference to the active scene's `openWindow` action.
     var openWindowAction: OpenWindowAction?
 
     /// Test-only hook: called instead of `openWindowAction` when set.
@@ -46,12 +45,7 @@ class WindowManager: ObservableObject {
 
     func showOpenPanel() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [
-            UTType(filenameExtension: "md")!,
-            UTType(filenameExtension: "markdown")!,
-        ]
-        panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = false
+        FileValidation.configureOpenPanel(panel, allowsMultipleSelection: true)
         if panel.runModal() == .OK {
             for url in panel.urls {
                 openFile(url)

@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct RootView: View {
     @Binding var fileURL: URL?
@@ -84,12 +83,7 @@ struct RootView: View {
 
     private func openFileInCurrentWindow() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [
-            UTType(filenameExtension: "md")!,
-            UTType(filenameExtension: "markdown")!,
-        ]
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
+        FileValidation.configureOpenPanel(panel, allowsMultipleSelection: false)
         if panel.runModal() == .OK, let url = panel.url {
             fileURL = url
         }
@@ -116,21 +110,28 @@ struct EmptyStateView: View {
     let onOpen: () -> Void
 
     var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "doc.text")
-                .font(.system(size: 64))
+        VStack(spacing: 18) {
+            Image(systemName: "doc.text.magnifyingglass")
+                .font(.system(size: 52, weight: .light))
                 .foregroundColor(.secondary)
-            Text("Markdown ファイルをドロップ")
-                .font(.title3)
-                .foregroundColor(.secondary)
-            Text("または")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+            VStack(spacing: 6) {
+                Text("Markdown を静かに読む")
+                    .font(.title3.weight(.semibold))
+                Text("ファイルをドロップするか、開くを選んでください。")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            }
             Button("ファイルを開く…") {
                 onOpen()
             }
+            .buttonStyle(.bordered)
             .keyboardShortcut("o", modifiers: .command)
+            Text("⌘O でも開けます")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
         }
+        .frame(maxWidth: 360)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(40)
     }
 }
