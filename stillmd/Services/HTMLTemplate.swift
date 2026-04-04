@@ -41,7 +41,9 @@ enum HTMLTemplate {
                 // This prevents injected <img onerror=...>, <script>, javascript: links, etc.
                 marked.use({
                     renderer: {
-                        html(token) { return ''; }
+                        html() {
+                            return '';
+                        }
                     }
                 });
 
@@ -50,9 +52,11 @@ enum HTMLTemplate {
                     gfm: true,
                     breaks: false,
                     highlight: function(code, lang) {
-                        if (lang && hljs.getLanguage(lang)) {
-                            return hljs.highlight(code, { language: lang }).value;
-                        }
+                        try {
+                            if (lang && hljs.getLanguage(lang)) {
+                                return hljs.highlight(code, { language: lang }).value;
+                            }
+                        } catch (e) {}
                         return code;
                     }
                 });
@@ -132,7 +136,11 @@ enum HTMLTemplate {
                         if (!line) {
                             lineContent.innerHTML = '&nbsp;';
                         } else if (language && hljs.getLanguage(language)) {
-                            lineContent.innerHTML = hljs.highlight(line, { language: language }).value;
+                            try {
+                                lineContent.innerHTML = hljs.highlight(line, { language: language }).value;
+                            } catch (e) {
+                                lineContent.innerHTML = escapeHTML(line);
+                            }
                         } else {
                             lineContent.innerHTML = escapeHTML(line);
                         }

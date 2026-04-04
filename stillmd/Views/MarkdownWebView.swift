@@ -24,6 +24,10 @@ struct MarkdownWebView: NSViewRepresentable {
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
         webView.setValue(false, forKey: "drawsBackground")
+        webView.setContentHuggingPriority(.defaultLow, for: .vertical)
+        webView.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        webView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+        webView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         let html = HTMLTemplate.build(
             markdownContent: markdownContent,
