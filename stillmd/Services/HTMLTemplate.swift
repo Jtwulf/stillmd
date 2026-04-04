@@ -192,6 +192,8 @@ enum HTMLTemplate {
 
                 function clearDocumentLineNumbers() {
                     documentLineNumberColumn.replaceChildren();
+                    documentLineNumberColumn.style.left = '';
+                    documentLineNumberColumn.style.top = '';
                     document.documentElement.style.setProperty('--document-line-number-gutter-width', '0px');
                 }
 
@@ -212,57 +214,102 @@ enum HTMLTemplate {
                     });
                 }
 
+                // getClientRects() can return multiple boxes per typographic line (e.g. inline <code>),
+                // which would stack multiple line numbers at the same Y — merge by baseline proximity.
+                function mergeVisualLineRects(rawRects) {
+                    if (!rawRects.length) {
+                        return [];
+                    }
+                    const sorted = rawRects.slice().sort((a, b) => a.top - b.top || a.left - b.left);
+                    const merged = [];
+                    const epsilon = 5;
+                    for (const rect of sorted) {
+                        const h = Math.max(rect.height, 1);
+                        const last = merged[merged.length - 1];
+                        if (last && Math.abs(rect.top - last.top) < epsilon) {
+                            const bottom = Math.max(last.top + last.height, rect.top + h);
+                            last.height = Math.max(1, bottom - last.top);
+                        } else {
+                            merged.push({ top: rect.top, height: h });
+                        }
+                    }
+                    return merged;
+                }
+
                 function layoutDocumentLineNumbers() {
                     if (!viewerState.documentLineNumbersVisible) {
                         clearDocumentLineNumbers();
                         return;
                     }
 
-                    const bodyRect = document.body.getBoundingClientRect();
                     const candidates = contentElement.querySelectorAll(
                         'h1, h2, h3, h4, h5, h6, p, li, tr, hr, .stillmd-code-line'
                     );
-                    const rows = [];
-                    let lineNumber = 1;
 
-                    for (const candidate of candidates) {
-                        if (candidate.tagName === 'P' && candidate.closest('li')) {
-                            continue;
-                        }
-
+                    function rectsForDocumentLineCandidate(candidate) {
                         if (candidate.tagName === 'LI' && candidate.querySelector('p, .stillmd-code-line')) {
-                            continue;
+                            return [];
                         }
-
+                        if (candidate.classList && candidate.classList.contains('stillmd-code-line')) {
+                            const box = candidate.getBoundingClientRect();
+                            return box.width > 0 || box.height > 0 ? [box] : [];
+                        }
                         const range = document.createRange();
                         range.selectNodeContents(candidate);
                         let rects = Array.from(range.getClientRects()).filter((rect) => {
                             return rect.width > 0 && rect.height > 0;
                         });
-
+                        rects = mergeVisualLineRects(rects);
                         if (!rects.length) {
                             const fallbackRect = candidate.getBoundingClientRect();
                             if (fallbackRect.width > 0 || fallbackRect.height > 0) {
-                                rects = [fallbackRect];
+                                rects = mergeVisualLineRects([fallbackRect]);
                             }
                         }
-
-                        for (const rect of rects) {
-                            const row = document.createElement('div');
-                            row.className = 'document-line-number';
-                            row.textContent = String(lineNumber++);
-                            row.style.top = `${rect.top - bodyRect.top}px`;
-                            row.style.height = `${Math.max(rect.height, 1)}px`;
-                            rows.push(row);
-                        }
+                        return rects;
                     }
 
-                    documentLineNumberColumn.replaceChildren(...rows);
-                    const digits = String(Math.max(1, lineNumber - 1)).length;
+                    let totalLines = 0;
+                    for (const candidate of candidates) {
+                        totalLines += rectsForDocumentLineCandidate(candidate).length;
+                    }
+
+                    const digits = String(Math.max(1, totalLines)).length;
                     document.documentElement.style.setProperty(
                         '--document-line-number-gutter-width',
                         `${Math.max(2, digits + 1)}ch`
                     );
+                    void contentElement.offsetWidth;
+
+                    const rowRects = [];
+                    for (const candidate of candidates) {
+                        for (const rect of rectsForDocumentLineCandidate(candidate)) {
+                            rowRects.push({
+                                top: rect.top,
+                                height: Math.max(rect.height, 1),
+                            });
+                        }
+                    }
+
+                    const overlayRect = documentLineNumberOverlay.getBoundingClientRect();
+                    const contentRect = contentElement.getBoundingClientRect();
+                    void documentLineNumberColumn.offsetWidth;
+                    const gutterWidthPx = documentLineNumberColumn.getBoundingClientRect().width;
+                    documentLineNumberColumn.style.left = `${contentRect.left - gutterWidthPx - overlayRect.left}px`;
+                    documentLineNumberColumn.style.top = `${contentRect.top - overlayRect.top}px`;
+
+                    const columnRect = documentLineNumberColumn.getBoundingClientRect();
+                    const fragment = document.createDocumentFragment();
+                    for (let i = 0; i < rowRects.length; i++) {
+                        const row = document.createElement('div');
+                        row.className = 'document-line-number';
+                        row.textContent = String(i + 1);
+                        const r = rowRects[i];
+                        row.style.top = `${r.top - columnRect.top}px`;
+                        row.style.height = `${r.height}px`;
+                        fragment.appendChild(row);
+                    }
+                    documentLineNumberColumn.replaceChildren(fragment);
                 }
 
                 function renderMarkdown(source) {
@@ -498,7 +545,10 @@ enum HTMLTemplate {
                         scheduleScrollReport();
                     });
                 }
-                window.addEventListener('scroll', scheduleScrollReport, { passive: true });
+                window.addEventListener('scroll', function() {
+                    scheduleScrollReport();
+                    scheduleDocumentLineNumberLayout();
+                }, { passive: true });
 
                 // Global updateContent function for live reload
                 function updateContent(md, targetScrollY) {
