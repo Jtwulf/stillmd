@@ -7,8 +7,10 @@ struct MarkdownPreviewerApp: App {
     var body: some Scene {
         WindowGroup(for: URL.self) { $url in
             if let url {
-                PreviewView(fileURL: url, windowManager: windowManager)
-                    .frame(minWidth: 600, minHeight: 400)
+                OpenWindowInjector(windowManager: windowManager) {
+                    PreviewView(fileURL: url, windowManager: windowManager)
+                        .frame(minWidth: 600, minHeight: 400)
+                }
             }
         }
         .handlesExternalEvents(matching: ["file"])

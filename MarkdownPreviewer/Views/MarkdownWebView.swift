@@ -83,22 +83,29 @@ struct MarkdownWebView: NSViewRepresentable {
                 return
             }
 
-            // External http/https links → open in system browser
+            // External http/https links -> open in system browser
             if url.scheme == "http" || url.scheme == "https" {
                 NSWorkspace.shared.open(url)
                 decisionHandler(.cancel)
                 return
             }
 
-            // file: links (relative .md links resolved by baseURL)
-            // Open .md files as new preview windows; open other files in Finder
+            // file: links (relative links resolved by baseURL)
             if url.scheme == "file" {
                 if FileValidation.isMarkdownFile(url) {
-                    // Post to linkClicked handler to open as new preview window
-                    // (WindowManager will handle this via the message handler)
+                    // Open .md files in this app (re-open via NSWorkspace targeting our bundle)
+                    if let bundleID = Bundle.main.bundleIdentifier {
+                        NSWorkspace.shared.open(
+                            [url],
+                            withApplicationAt: NSWorkspace.shared.urlForApplication(
+                                withBundleIdentifier: bundleID)!,
+                            configuration: NSWorkspace.OpenConfiguration()
+                        )
+                    }
+                } else {
+                    // Non-markdown file: links -> open in Finder/default app
+                    NSWorkspace.shared.open(url)
                 }
-                // For non-markdown file: links, open in Finder
-                NSWorkspace.shared.open(url)
                 decisionHandler(.cancel)
                 return
             }
