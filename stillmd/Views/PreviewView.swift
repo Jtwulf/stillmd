@@ -109,7 +109,7 @@ struct PreviewView: View {
                     findQuery: findQuery,
                     findRequest: findRequest,
                     findStatus: $findStatus,
-                    onInitialNavigationFinished: onMarkdownWebViewInitialLoadFinished
+                    onInitialNavigationCommitted: onMarkdownWebViewInitialNavigationCommitted
                 )
             } else if let error = viewModel.errorMessage {
                 ErrorView(message: error)
@@ -137,7 +137,7 @@ struct PreviewView: View {
 
         if shouldKeepPreviewVisible {
             webRevealFallbackTask = Task { @MainActor in
-                try? await Task.sleep(for: .seconds(2))
+                try? await Task.sleep(for: .milliseconds(500))
                 guard !Task.isCancelled, previewRevealScheduleID == scheduleID, !isPreviewRevealed else { return }
                 isPreviewRevealed = true
             }
@@ -150,7 +150,7 @@ struct PreviewView: View {
         }
     }
 
-    private func onMarkdownWebViewInitialLoadFinished() {
+    private func onMarkdownWebViewInitialNavigationCommitted() {
         webRevealFallbackTask?.cancel()
         webRevealFallbackTask = nil
         let scheduleID = previewRevealScheduleID
