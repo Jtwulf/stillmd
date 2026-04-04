@@ -59,7 +59,14 @@ struct PreviewView: View {
             // regardless of how the window was created (Finder, Dock, NSWorkspace, etc.)
             windowManager.registerFile(fileURL)
             viewModel.startWatching()
-            schedulePreviewReveal()
+            if !shouldKeepPreviewVisible {
+                schedulePreviewReveal()
+            }
+        }
+        .onChange(of: shouldKeepPreviewVisible) { wasVisible, isVisible in
+            if wasVisible, !isVisible {
+                schedulePreviewReveal()
+            }
         }
         .onDisappear {
             pendingFindResetTask?.cancel()
@@ -109,7 +116,8 @@ struct PreviewView: View {
                     findQuery: findQuery,
                     findRequest: findRequest,
                     findStatus: $findStatus,
-                    onInitialNavigationCommitted: onMarkdownWebViewInitialNavigationCommitted
+                    onInitialNavigationCommitted: onMarkdownWebViewInitialNavigationCommitted,
+                    onWillLoadWebContent: { schedulePreviewReveal() }
                 )
             } else if let error = viewModel.errorMessage {
                 ErrorView(message: error)

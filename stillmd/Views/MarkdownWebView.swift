@@ -13,8 +13,12 @@ struct MarkdownWebView: NSViewRepresentable {
     @Binding var findStatus: FindStatus
     /// Fires once when the main-frame navigation commits content (`didCommit`), before subresources finish.
     var onInitialNavigationCommitted: (() -> Void)? = nil
+    /// Called synchronously at the start of `makeNSView` before `loadHTMLString` (for reveal timing vs WebKit).
+    var onWillLoadWebContent: (() -> Void)? = nil
 
     func makeNSView(context: Context) -> WKWebView {
+        onWillLoadWebContent?()
+
         let config = WKWebViewConfiguration()
 
         let userController = WKUserContentController()
