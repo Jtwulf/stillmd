@@ -11,6 +11,8 @@ struct MarkdownWebView: NSViewRepresentable {
     let findQuery: String
     let findRequest: FindRequest?
     @Binding var findStatus: FindStatus
+    /// Fires once after the initial `loadHTMLString` navigation completes (main frame).
+    var onInitialNavigationFinished: (() -> Void)? = nil
 
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
@@ -124,6 +126,7 @@ struct MarkdownWebView: NSViewRepresentable {
 
     class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var parent: MarkdownWebView
+        private var didReportInitialNavigationFinish = false
         var lastContent: String = ""
         var lastThemePreference: String = ThemePreference.system.rawValue
         var lastTextScale: Double = AppPreferences.defaultTextScale
@@ -136,6 +139,15 @@ struct MarkdownWebView: NSViewRepresentable {
         }
 
         // MARK: - WKNavigationDelegate
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            guard !didReportInitialNavigationFinish else { return }
+            didReportInitialNavigationFinish = true
+            let callback = parent.onInitialNavigationFinished
+            DispatchQueue.main.async {
+                callback?()
+            }
+        }
 
         func webView(
             _ webView: WKWebView,

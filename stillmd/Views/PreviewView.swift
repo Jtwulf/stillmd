@@ -19,6 +19,7 @@ struct PreviewView: View {
     @State private var pendingFindResetTask: Task<Void, Never>?
     @State private var isPreviewRevealed = false
     @State private var previewRevealScheduleID = 0
+    @State private var webRevealFallbackTask: Task<Void, Never>?
 
     init(fileURL: URL, windowManager: WindowManager) {
         self.fileURL = fileURL
@@ -62,6 +63,7 @@ struct PreviewView: View {
         }
         .onDisappear {
             pendingFindResetTask?.cancel()
+            webRevealFallbackTask?.cancel()
             viewModel.stopWatching()
             windowManager.closeFile(fileURL)
         }
@@ -106,7 +108,8 @@ struct PreviewView: View {
                     documentLineNumbersVisible: isDocumentLineNumbersPresented,
                     findQuery: findQuery,
                     findRequest: findRequest,
-                    findStatus: $findStatus
+                    findStatus: $findStatus,
+                    onInitialNavigationFinished: onMarkdownWebViewInitialLoadFinished
                 )
             } else if let error = viewModel.errorMessage {
                 ErrorView(message: error)
@@ -121,6 +124,9 @@ struct PreviewView: View {
     }
 
     private func schedulePreviewReveal() {
+        webRevealFallbackTask?.cancel()
+        webRevealFallbackTask = nil
+
         previewRevealScheduleID += 1
         let scheduleID = previewRevealScheduleID
         if reduceMotion {
@@ -128,8 +134,27 @@ struct PreviewView: View {
             return
         }
         isPreviewRevealed = false
+
+        if shouldKeepPreviewVisible {
+            webRevealFallbackTask = Task { @MainActor in
+                try? await Task.sleep(for: .seconds(2))
+                guard !Task.isCancelled, previewRevealScheduleID == scheduleID, !isPreviewRevealed else { return }
+                isPreviewRevealed = true
+            }
+        } else {
+            Task { @MainActor in
+                await Task.yield()
+                guard previewRevealScheduleID == scheduleID else { return }
+                isPreviewRevealed = true
+            }
+        }
+    }
+
+    private func onMarkdownWebViewInitialLoadFinished() {
+        webRevealFallbackTask?.cancel()
+        webRevealFallbackTask = nil
+        let scheduleID = previewRevealScheduleID
         Task { @MainActor in
-            await Task.yield()
             guard previewRevealScheduleID == scheduleID else { return }
             isPreviewRevealed = true
         }
