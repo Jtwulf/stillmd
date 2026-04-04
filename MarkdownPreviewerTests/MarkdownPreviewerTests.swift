@@ -1621,3 +1621,30 @@ struct CodeBlockHighlightingPropertyTests {
                 "Template should contain the code content even without language")
     }
 }
+
+@Suite("StillmdMotion Unit Tests")
+struct StillmdMotionUnitTests {
+
+    @Test("Motion specs keep stillmd timing compact")
+    func motionSpecsRemainCompact() {
+        #expect(StillmdMotion.emptyReveal.duration == 0.18)
+        #expect(StillmdMotion.emptyReveal.offsetY == 5)
+        #expect(StillmdMotion.findBarInsertion.duration == 0.14)
+        #expect(StillmdMotion.findBarInsertion.offsetY == -4)
+        #expect(StillmdMotion.findBarRemoval.duration == 0.10)
+        #expect(StillmdMotion.findBarRemoval.offsetY == -3)
+    }
+
+    @Test("Reduce Motion disables generated animations")
+    func reduceMotionDisablesAnimations() {
+        #expect(StillmdMotion.animation(for: StillmdMotion.emptyReveal, reduceMotion: true) == nil)
+        #expect(StillmdMotion.animation(for: StillmdMotion.findBarInsertion, reduceMotion: true) == nil)
+    }
+
+    @Test("Standard motion paths still provide animations")
+    func standardMotionProvidesAnimations() {
+        #expect(StillmdMotion.animation(for: StillmdMotion.emptyReveal, reduceMotion: false) != nil)
+        #expect(StillmdMotion.animation(for: StillmdMotion.findBarInsertion, reduceMotion: false) != nil)
+        #expect(StillmdMotion.animation(for: StillmdMotion.findBarRemoval, reduceMotion: false) != nil)
+    }
+}
