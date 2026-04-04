@@ -24,7 +24,10 @@ fi
     cd "$PROJECT_DIR/build"
     COPYFILE_DISABLE=1 zip -qryX "$ZIP_PATH" "stillmd.app"
 )
-shasum -a 256 "$ZIP_PATH" > "$SHA_PATH"
+(
+    cd "$DIST_DIR"
+    shasum -a 256 "$(basename "$ZIP_PATH")"
+) > "$SHA_PATH"
 
 echo "Created release archive: $ZIP_PATH"
 echo "Created checksum: $SHA_PATH"
