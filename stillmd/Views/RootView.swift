@@ -69,7 +69,8 @@ struct RootView: View {
     private var rootContent: some View {
         if let url = documentSession.fileURL {
             PreviewView(fileURL: url, windowManager: windowManager)
-                .id(url.path)
+                // New `PreviewView` + `StateObject` per file so URL changes reload the document and replay preview reveal.
+                .id(url.standardizedFileURL.path)
         } else {
             EmptyStateView(
                 onOpen: {

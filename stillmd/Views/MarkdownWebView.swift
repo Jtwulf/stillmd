@@ -35,8 +35,14 @@ struct MarkdownWebView: NSViewRepresentable {
     let findQuery: String
     let findRequest: FindRequest?
     @Binding var findStatus: FindStatus
+    /// Fires once when the main-frame navigation commits content (`didCommit`), before subresources finish.
+    var onInitialNavigationCommitted: (() -> Void)? = nil
+    /// Called synchronously at the start of `makeNSView` before `loadHTMLString` (for reveal timing vs WebKit).
+    var onWillLoadWebContent: (() -> Void)? = nil
 
     func makeNSView(context: Context) -> StillmdMarkdownWebContainerView {
+        onWillLoadWebContent?()
+
         let config = WKWebViewConfiguration()
 
         let userController = WKUserContentController()
@@ -150,6 +156,7 @@ struct MarkdownWebView: NSViewRepresentable {
 
     class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var parent: MarkdownWebView
+        private var didReportInitialNavigationCommit = false
         var lastContent: String = ""
         var lastThemePreference: String = ThemePreference.system.rawValue
         var lastTextScale: Double = AppPreferences.defaultTextScale
@@ -162,6 +169,15 @@ struct MarkdownWebView: NSViewRepresentable {
         }
 
         // MARK: - WKNavigationDelegate
+
+        func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+            guard !didReportInitialNavigationCommit else { return }
+            didReportInitialNavigationCommit = true
+            let callback = parent.onInitialNavigationCommitted
+            DispatchQueue.main.async {
+                callback?()
+            }
+        }
 
         func webView(
             _ webView: WKWebView,

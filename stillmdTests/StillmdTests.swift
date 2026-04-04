@@ -1704,6 +1704,8 @@ struct StillmdMotionUnitTests {
     func motionSpecsRemainCompact() {
         #expect(StillmdMotion.emptyReveal.duration == 0.18)
         #expect(StillmdMotion.emptyReveal.offsetY == 5)
+        #expect(StillmdMotion.previewReveal.duration == StillmdMotion.emptyReveal.duration)
+        #expect(StillmdMotion.previewReveal.offsetY == StillmdMotion.emptyReveal.offsetY)
         #expect(StillmdMotion.findBarInsertion.duration == 0.14)
         #expect(StillmdMotion.findBarInsertion.offsetY == -4)
         #expect(StillmdMotion.findBarRemoval.duration == 0.10)
@@ -1713,12 +1715,14 @@ struct StillmdMotionUnitTests {
     @Test("Reduce Motion disables generated animations")
     func reduceMotionDisablesAnimations() {
         #expect(StillmdMotion.animation(for: StillmdMotion.emptyReveal, reduceMotion: true) == nil)
+        #expect(StillmdMotion.animation(for: StillmdMotion.previewReveal, reduceMotion: true) == nil)
         #expect(StillmdMotion.animation(for: StillmdMotion.findBarInsertion, reduceMotion: true) == nil)
     }
 
     @Test("Standard motion paths still provide animations")
     func standardMotionProvidesAnimations() {
         #expect(StillmdMotion.animation(for: StillmdMotion.emptyReveal, reduceMotion: false) != nil)
+        #expect(StillmdMotion.animation(for: StillmdMotion.previewReveal, reduceMotion: false) != nil)
         #expect(StillmdMotion.animation(for: StillmdMotion.findBarInsertion, reduceMotion: false) != nil)
         #expect(StillmdMotion.animation(for: StillmdMotion.findBarRemoval, reduceMotion: false) != nil)
     }

@@ -17,6 +17,9 @@ struct PreviewView: View {
     @State private var isFindBarChromeReserved = false
     @State private var isDocumentLineNumbersPresented = false
     @State private var pendingFindResetTask: Task<Void, Never>?
+    @State private var isPreviewRevealed = false
+    @State private var previewRevealScheduleID = 0
+    @State private var webRevealFallbackTask: Task<Void, Never>?
 
     init(fileURL: URL, windowManager: WindowManager) {
         self.fileURL = fileURL
@@ -37,6 +40,14 @@ struct PreviewView: View {
         isFindBarChromeReserved || (viewModel.errorMessage != nil && shouldKeepPreviewVisible)
     }
 
+    private var previewRevealOpacity: Double {
+        reduceMotion ? 1 : (isPreviewRevealed ? 1 : 0)
+    }
+
+    private var previewRevealOffset: CGFloat {
+        reduceMotion || isPreviewRevealed ? 0 : StillmdMotion.previewReveal.offsetY
+    }
+
     var body: some View {
         // Use a plain `VStack` instead of `safeAreaInset`: inside `NSHostingView` + fullSizeContentView,
         // top safe-area math can collapse the web content to zero height (blank white preview).
@@ -52,9 +63,18 @@ struct PreviewView: View {
             // regardless of how the window was created (Finder, Dock, NSWorkspace, etc.)
             windowManager.registerFile(fileURL)
             viewModel.startWatching()
+            if !shouldKeepPreviewVisible {
+                schedulePreviewReveal()
+            }
+        }
+        .onChange(of: shouldKeepPreviewVisible) { wasVisible, isVisible in
+            if wasVisible, !isVisible {
+                schedulePreviewReveal()
+            }
         }
         .onDisappear {
             pendingFindResetTask?.cancel()
+            webRevealFallbackTask?.cancel()
             viewModel.stopWatching()
             windowManager.closeFile(fileURL)
         }
@@ -88,26 +108,73 @@ struct PreviewView: View {
 
     @ViewBuilder
     private var corePreview: some View {
-        if shouldKeepPreviewVisible {
-            // `GeometryReader` defaults to min height in stacks; outer `frame(max…)` gives it a real size so
-            // `NSViewRepresentable` is not laid out with a zero proposal (blank white preview).
-            GeometryReader { proxy in
-                MarkdownWebView(
-                    markdownContent: viewModel.markdownContent,
-                    baseURL: fileURL.deletingLastPathComponent(),
-                    scrollPosition: $viewModel.scrollPosition,
-                    themePreference: themePreference,
-                    textScale: AppPreferences.clampedTextScale(textScale),
-                    documentLineNumbersVisible: isDocumentLineNumbersPresented,
-                    findQuery: findQuery,
-                    findRequest: findRequest,
-                    findStatus: $findStatus
-                )
-                .frame(width: proxy.size.width, height: proxy.size.height)
+        Group {
+            if shouldKeepPreviewVisible {
+                // `GeometryReader` defaults to min height in stacks; outer `frame(max…)` gives it a real size so
+                // `NSViewRepresentable` is not laid out with a zero proposal (blank white preview).
+                GeometryReader { proxy in
+                    MarkdownWebView(
+                        markdownContent: viewModel.markdownContent,
+                        baseURL: fileURL.deletingLastPathComponent(),
+                        scrollPosition: $viewModel.scrollPosition,
+                        themePreference: themePreference,
+                        textScale: AppPreferences.clampedTextScale(textScale),
+                        documentLineNumbersVisible: isDocumentLineNumbersPresented,
+                        findQuery: findQuery,
+                        findRequest: findRequest,
+                        findStatus: $findStatus,
+                        onInitialNavigationCommitted: onMarkdownWebViewInitialNavigationCommitted,
+                        onWillLoadWebContent: { schedulePreviewReveal() }
+                    )
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let error = viewModel.errorMessage {
+                ErrorView(message: error)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if let error = viewModel.errorMessage {
-            ErrorView(message: error)
+        }
+        .opacity(previewRevealOpacity)
+        .offset(y: previewRevealOffset)
+        .animation(
+            StillmdMotion.animation(for: StillmdMotion.previewReveal, reduceMotion: reduceMotion),
+            value: isPreviewRevealed
+        )
+    }
+
+    private func schedulePreviewReveal() {
+        webRevealFallbackTask?.cancel()
+        webRevealFallbackTask = nil
+
+        previewRevealScheduleID += 1
+        let scheduleID = previewRevealScheduleID
+        if reduceMotion {
+            isPreviewRevealed = true
+            return
+        }
+        isPreviewRevealed = false
+
+        if shouldKeepPreviewVisible {
+            webRevealFallbackTask = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(500))
+                guard !Task.isCancelled, previewRevealScheduleID == scheduleID, !isPreviewRevealed else { return }
+                isPreviewRevealed = true
+            }
+        } else {
+            Task { @MainActor in
+                await Task.yield()
+                guard previewRevealScheduleID == scheduleID else { return }
+                isPreviewRevealed = true
+            }
+        }
+    }
+
+    private func onMarkdownWebViewInitialNavigationCommitted() {
+        webRevealFallbackTask?.cancel()
+        webRevealFallbackTask = nil
+        let scheduleID = previewRevealScheduleID
+        Task { @MainActor in
+            guard previewRevealScheduleID == scheduleID else { return }
+            isPreviewRevealed = true
         }
     }
 
