@@ -1,6 +1,26 @@
 import AppKit
 import SwiftUI
 
+private final class NotificationTokenBag: @unchecked Sendable {
+    private var tokens: [NSObjectProtocol] = []
+
+    func append(_ token: NSObjectProtocol) {
+        tokens.append(token)
+    }
+
+    func removeAll() {
+        let snapshot = tokens
+        tokens.removeAll()
+        for token in snapshot {
+            NotificationCenter.default.removeObserver(token)
+        }
+    }
+
+    var isEmpty: Bool {
+        tokens.isEmpty
+    }
+}
+
 private struct TitlebarDocumentTitleView: View {
     let title: String
     let colorScheme: ColorScheme
@@ -171,10 +191,14 @@ struct WindowAccessor: NSViewRepresentable {
         weak var latestWindowManager: WindowManager?
 
         private weak var observedWindow: NSWindow?
-        private var notificationObservers: [NSObjectProtocol] = []
+        private let notificationObservers = NotificationTokenBag()
         private var lifecycleReapply: (() -> Void)?
         private var documentTitleAccessory: StillmdDocumentTitleAccessoryController?
         private weak var accessoryWindow: NSWindow?
+
+        deinit {
+            notificationObservers.removeAll()
+        }
 
         func teardown() {
             // Invalidate any in-flight delayed reapply work from `updateWindow`.
@@ -205,7 +229,6 @@ struct WindowAccessor: NSViewRepresentable {
                 NSWindow.didResignKeyNotification,
                 NSWindow.didBecomeMainNotification,
                 NSWindow.didResignMainNotification,
-                NSWindow.didResizeNotification,
             ]
 
             for name in names {
@@ -223,10 +246,6 @@ struct WindowAccessor: NSViewRepresentable {
         }
 
         private func removeWindowLifecycleObservers() {
-            let center = NotificationCenter.default
-            for token in notificationObservers {
-                center.removeObserver(token)
-            }
             notificationObservers.removeAll()
             observedWindow = nil
             lifecycleReapply = nil
