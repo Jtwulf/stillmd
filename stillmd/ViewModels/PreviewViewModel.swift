@@ -46,6 +46,8 @@ class PreviewViewModel: ObservableObject {
     }
 
     func startWatching() {
+        // `stopWatching` は保留デバウンスを捨てるため、再表示時に必ずディスクと同期する。
+        loadFile()
         fileWatcher = FileWatcher(url: fileURL) { [weak self] event in
             Task { @MainActor in
                 self?.handleFileEvent(event)

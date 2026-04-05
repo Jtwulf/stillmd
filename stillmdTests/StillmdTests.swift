@@ -1643,9 +1643,9 @@ struct PreviewViewModelUnitTests {
         #expect(vm.errorMessage?.contains("読み込めません") != true)
     }
 
-    @Test("stopWatching cancels pending debounce without synchronous disk read")
+    @Test("stopWatching cancels pending debounce; startWatching resyncs from disk")
     @MainActor
-    func stopWatchingCancelsDebounceWithoutReload() async throws {
+    func stopWatchingCancelsDebounceAndStartWatchingResyncs() async throws {
         let fileURL = try createTempFile(content: "old")
         defer { try? FileManager.default.removeItem(at: fileURL) }
 
@@ -1657,6 +1657,9 @@ struct PreviewViewModelUnitTests {
         #expect(vm.markdownContent == "old")
         try await Task.sleep(for: .milliseconds(200))
         #expect(vm.markdownContent == "old")
+
+        vm.startWatching()
+        #expect(vm.markdownContent == "new")
     }
 }
 
