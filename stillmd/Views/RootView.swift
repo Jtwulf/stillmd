@@ -4,6 +4,7 @@ struct RootView: View {
     @ObservedObject var documentSession: DocumentWindowSession
     @ObservedObject var windowManager: WindowManager
     @ObservedObject var pendingFileOpenCoordinator: PendingFileOpenCoordinator
+    @ObservedObject var findCommandBindings: FindCommandBindings
     @Environment(\.documentChromeController) private var documentChromeController
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage(AppPreferences.themeKey) private var themePreferenceRawValue =
@@ -39,6 +40,14 @@ struct RootView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .preferredColorScheme(themePreference.colorScheme)
+        // Keep command actions at the window root so the active document window owns shortcut state.
+        .focusedSceneValue(\.toggleFindBarAction, findCommandBindings.toggleFindBarAction)
+        .focusedSceneValue(
+            \.toggleDocumentLineNumbersAction,
+            findCommandBindings.toggleDocumentLineNumbersAction
+        )
+        .focusedSceneValue(\.findNextAction, findCommandBindings.findNextAction)
+        .focusedSceneValue(\.findPreviousAction, findCommandBindings.findPreviousAction)
         .onAppear {
             if documentSession.fileURL != nil {
                 isEmptyStatePresented = false
@@ -74,7 +83,11 @@ struct RootView: View {
     @ViewBuilder
     private var rootContent: some View {
         if let url = documentSession.fileURL {
-            PreviewView(fileURL: url, windowManager: windowManager)
+            PreviewView(
+                fileURL: url,
+                windowManager: windowManager,
+                findCommandBindings: findCommandBindings
+            )
                 // New `PreviewView` + `StateObject` per file so URL changes reload the document and replay preview reveal.
                 .id(url.standardizedFileURL.path)
         } else {

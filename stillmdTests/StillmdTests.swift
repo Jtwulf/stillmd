@@ -234,6 +234,55 @@ struct PendingFileOpenCoordinatorUnitTests {
     }
 }
 
+@Suite("FindCommandBindings Unit Tests")
+@MainActor
+struct FindCommandBindingsUnitTests {
+
+    @Test("installPreviewActions stores all closures")
+    func installPreviewActionsStoresClosures() {
+        let bindings = FindCommandBindings()
+        var toggleFindBarCount = 0
+        var toggleLineNumbersCount = 0
+        var findNextCount = 0
+        var findPreviousCount = 0
+
+        bindings.installPreviewActions(
+            toggleFindBar: { toggleFindBarCount += 1 },
+            toggleDocumentLineNumbers: { toggleLineNumbersCount += 1 },
+            findNext: { findNextCount += 1 },
+            findPrevious: { findPreviousCount += 1 }
+        )
+
+        bindings.toggleFindBarAction?.perform()
+        bindings.toggleDocumentLineNumbersAction?.perform()
+        bindings.findNextAction?.perform()
+        bindings.findPreviousAction?.perform()
+
+        #expect(toggleFindBarCount == 1)
+        #expect(toggleLineNumbersCount == 1)
+        #expect(findNextCount == 1)
+        #expect(findPreviousCount == 1)
+    }
+
+    @Test("clearPreviewActions removes stored closures")
+    func clearPreviewActionsRemovesStoredClosures() {
+        let bindings = FindCommandBindings()
+        bindings.installPreviewActions(
+            toggleFindBar: {},
+            toggleDocumentLineNumbers: {},
+            findNext: {},
+            findPrevious: {}
+        )
+
+        bindings.clearPreviewActions()
+
+        #expect(bindings.toggleFindBarAction == nil)
+        #expect(bindings.toggleDocumentLineNumbersAction == nil)
+        #expect(bindings.findNextAction == nil)
+        #expect(bindings.findPreviousAction == nil)
+    }
+}
+
 @Suite("LaunchOpenRequestCoordinator Unit Tests")
 @MainActor
 struct LaunchOpenRequestCoordinatorUnitTests {
