@@ -1,20 +1,38 @@
 import Foundation
 
 enum ResourceLoader {
+    private static let lock = NSLock()
+    /// Guarded by `lock`; `nonisolated(unsafe)` documents manual synchronization for Swift 6.
+    nonisolated(unsafe) private static var markedCache: String?
+    nonisolated(unsafe) private static var highlightCache: String?
+    nonisolated(unsafe) private static var mermaidCache: String?
+    nonisolated(unsafe) private static var cssCache: String?
+
     static func loadMarkedJS() -> String {
-        loadBundleResource(name: "marked.min", ext: "js")
+        cached(&markedCache, name: "marked.min", ext: "js")
     }
 
     static func loadHighlightJS() -> String {
-        loadBundleResource(name: "highlight.min", ext: "js")
+        cached(&highlightCache, name: "highlight.min", ext: "js")
     }
 
     static func loadMermaidJS() -> String {
-        loadBundleResource(name: "mermaid.min", ext: "js")
+        cached(&mermaidCache, name: "mermaid.min", ext: "js")
     }
 
     static func loadCSS() -> String {
-        loadBundleResource(name: "preview", ext: "css")
+        cached(&cssCache, name: "preview", ext: "css")
+    }
+
+    private static func cached(_ slot: inout String?, name: String, ext: String) -> String {
+        lock.lock()
+        defer { lock.unlock() }
+        if let cached = slot {
+            return cached
+        }
+        let loaded = loadBundleResource(name: name, ext: ext)
+        slot = loaded
+        return loaded
     }
 
     private static func loadBundleResource(name: String, ext: String) -> String {
