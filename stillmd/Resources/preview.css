@@ -59,7 +59,7 @@ body {
     background-color: var(--bg-color);
     max-width: 46rem;
     margin: 0 auto;
-    padding: 44px 28px 72px;
+    padding: 28px 28px 72px;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
 }

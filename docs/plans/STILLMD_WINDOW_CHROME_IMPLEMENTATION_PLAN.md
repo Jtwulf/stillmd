@@ -72,7 +72,7 @@
 - `RootView` が `Text(windowTitle)` を **`.overlay(alignment: .top)`** で描画している（`padding(.top, 8)` + `padding(.horizontal, 120)`）。
 - **オーバーレイはレイアウト上の領域を確保しない**ため、子ビュー（`PreviewView` 内の `MarkdownWebView`）はトップ方向の「タイトル用文字列の高さ」を考慮せずに配置される。
 - `PreviewView` の `safeAreaInset(edge: .top)` は **FindBar / エラー帯が出ているときだけ**実高さを持ち、非表示時は `Color.clear.frame(height: 0)` となる（`shouldShowTopChrome`）。
-- `preview.css` の `body` は `padding: 44px 28px 72px` など **固定値**で、SwiftUI 側のタイトルオーバーレイ高さ・有無と連動していない。
+- `preview.css` の `body` は `padding: 28px 28px 72px` など **固定値**で、SwiftUI 側のタイトルオーバーレイ高さ・有無と連動していない。
 
 **推論されるメカニズム**
 
@@ -115,9 +115,9 @@
 
 - **オーバーレイによるファイル名表示を廃止**する（`RootView` の `.overlay(alignment: .top) { Text(windowTitle) }` を撤去）。
 - ファイル名を **レイアウト上のトップクローム**として配置（A ならタイトルバーアクセサリ、B なら `RootView` 先頭の固定高さ領域）。
-- `PreviewView` の `safeAreaInset(edge: .top)` は引き続き **FindBar / エラー帯**用とし、**ファイル名用ではない**（責務分離を維持）。ただし **視覚的な順序**は次を満たす:
+- `PreviewView` の `safeAreaInset(edge: .top)` は引き続き **FindBar / エラー帯**用とし、**ファイル名用ではない**（責務分離を維持）。`RootView` の上部スペーサーは廃止し、本文開始位置は titlebar accessory + `preview.css` の余白で決める。ただし **視覚的な順序**は次を満たす:
   - 上から: **（タイトルバー帯のファイル名） → （エラー帯あれば） → （FindBar あれば） → 本文**
-- `preview.css` の `body` `padding-top` は、**最終的な本文開始位置**が読みやすいこと、かつ **SwiftUI 側のトップインセットと二重にならないこと**を確認してから必要最小限で調整。
+- `preview.css` の `body` `padding-top` は、**最終的な本文開始位置**が読みやすいこと、かつ **SwiftUI 側のトップインセットと二重にならないこと**を確認してから必要最小限で調整。現時点の方針は **44px から 28px へ縮小**すること。
 
 ---
 
@@ -164,7 +164,8 @@
 - [x] 採用 A: `NSTitlebarAccessoryViewController` を追加し、`windowTitle` / テーマに追従して更新
 - [x] 採用 B: `RootView` 上部に固定高さトップバーを追加し、`safeAreaInsets` または実測値で traffic light と干渉しないパディングを設定（**A 採用のため実施せず**）
 - [x] 長いファイル名は **中央省略**（現状 `truncationMode(.middle)` を維持）
-- [x] `preview.css` の `body` 上余白を確認し、**二重パディング**があれば調整（現状のまま維持で問題なしと判断）
+- [x] `RootView` の `Color.clear.frame(height: 28)` は廃止し、上部の空き地を削除する
+- [x] `preview.css` の `body` 上余白を確認し、**二重パディング**があれば調整（`padding-top` は 44px から 28px へ縮小）
 - [x] `PreviewView` の `topChrome`（FindBar・エラー帯）が **ファイル名の下**に自然に積まれることを確認（レイアウト責務は従来どおり `PreviewView` 側）
 
 **手動確認（症状2・レイアウト）**
@@ -206,12 +207,12 @@
 ## 8. 参照ファイル（改訂時の起点）
 
 - `MarkdownPreviewer/Views/WindowAccessor.swift` — ウインドウ属性の一元設定
-- `MarkdownPreviewer/Views/RootView.swift` — シーンルート（タイトル overlay は撤去済み）
+- `MarkdownPreviewer/Views/RootView.swift` — シーンルート（上部スペーサー撤去）
 - `MarkdownPreviewer/Views/PreviewView.swift` — `safeAreaInset` による FindBar / エラー帯
 - `MarkdownPreviewer/Views/FindBar.swift` / `ErrorView.swift`（および `InlineStatusBanner` 呼び出し側）
 - `MarkdownPreviewer/Services/WindowManager.swift` — 重複ウィンドウ・前面化
 - `MarkdownPreviewer/Services/WindowSurfacePalette.swift` — 背景色の一貫性
-- `MarkdownPreviewer/Resources/preview.css` — 本文周り余白
+- `MarkdownPreviewer/Resources/preview.css` — 本文周り余白（`padding-top` 調整対象）
 
 ---
 

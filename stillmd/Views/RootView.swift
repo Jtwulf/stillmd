@@ -26,11 +26,8 @@ struct RootView: View {
             WindowSurfacePalette.background(for: resolvedColorScheme)
                 .ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                Color.clear.frame(height: 28)
-                rootContent
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
+            rootContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .preferredColorScheme(themeState.themePreference.colorScheme)
