@@ -15,6 +15,7 @@ enum HTMLTemplate {
         css: String,
         initialScrollPosition: Double = 0,
         themePreference: String = ThemePreference.system.rawValue,
+        resolvedTheme: String,
         textScale: Double = AppPreferences.defaultTextScale,
         documentLineNumbersVisible: Bool = false,
         documentBaseURL: URL? = nil,
@@ -25,6 +26,9 @@ enum HTMLTemplate {
         // or being interpreted as JS (template literals / unterminated strings → blank WebView).
         let markdownBase64 = Data(markdownContent.utf8).base64EncodedString()
         let escapedThemePreference = themePreference
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        let escapedResolvedThemeValue = resolvedTheme
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
         let escapedInitialFindQuery = initialFindQuery
@@ -102,18 +106,19 @@ enum HTMLTemplate {
                 const contentElement = document.getElementById('content');
                 const documentLineNumberOverlay = document.getElementById('document-line-number-overlay');
                 const documentLineNumberColumn = document.getElementById('document-line-number-column');
-                const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
                 const messageHandlers = window.webkit?.messageHandlers ?? {};
                 const scrollHandler = messageHandlers.scrollPosition ?? null;
                 const findResultsHandler = messageHandlers.findResults ?? null;
                 const linkClickedHandler = messageHandlers.linkClicked ?? null;
                 const initialScrollY = \(initialScrollPosition);
                 const initialThemePreference = "\(escapedThemePreference)";
+                const initialResolvedTheme = "\(escapedResolvedThemeValue)";
                 const initialTextScale = \(textScale);
                 const initialDocumentLineNumbersVisible = \(documentLineNumbersVisible ? "true" : "false");
                 const initialFindQuery = "\(escapedInitialFindQuery)";
                 const viewerState = {
                     themePreference: initialThemePreference,
+                    resolvedTheme: initialResolvedTheme,
                     findQuery: initialFindQuery,
                     documentLineNumbersVisible: initialDocumentLineNumbersVisible,
                 };
@@ -259,9 +264,7 @@ enum HTMLTemplate {
                 }
 
                 function getResolvedMermaidTheme() {
-                    return viewerState.themePreference === 'system'
-                        ? (mediaQuery.matches ? 'dark' : 'default')
-                        : (viewerState.themePreference === 'dark' ? 'dark' : 'default');
+                    return viewerState.resolvedTheme === 'dark' ? 'dark' : 'default';
                 }
 
                 function configureMermaid() {
@@ -721,18 +724,16 @@ enum HTMLTemplate {
                 }
 
                 function applyTheme() {
-                    const resolvedTheme = viewerState.themePreference === 'system'
-                        ? (mediaQuery.matches ? 'dark' : 'light')
-                        : viewerState.themePreference;
-                    document.documentElement.setAttribute('data-theme', resolvedTheme);
+                    document.documentElement.setAttribute('data-theme', viewerState.resolvedTheme);
                     document.documentElement.setAttribute(
                         'data-theme-preference',
                         viewerState.themePreference
                     );
                 }
 
-                function setThemePreference(nextThemePreference) {
+                function setThemePreference(nextThemePreference, nextResolvedTheme) {
                     viewerState.themePreference = nextThemePreference || 'system';
+                    viewerState.resolvedTheme = nextResolvedTheme || 'light';
                     applyTheme();
                     void renderMermaidBlocks();
                     scheduleDocumentLineNumberLayout();
@@ -791,13 +792,8 @@ enum HTMLTemplate {
                     }
                 });
 
-                // Dark mode detection
-                function updateTheme(e) {
-                    applyTheme();
-                }
-                mediaQuery.addEventListener('change', updateTheme);
                 window.__stillmdBootPhase = 'theme-ready';
-                setThemePreference(initialThemePreference);
+                setThemePreference(initialThemePreference, initialResolvedTheme);
                 setTextScale(initialTextScale);
                 setDocumentLineNumbersVisible(initialDocumentLineNumbersVisible);
 

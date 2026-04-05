@@ -4,23 +4,17 @@ struct RootView: View {
     @ObservedObject var documentSession: DocumentWindowSession
     @ObservedObject var windowManager: WindowManager
     @ObservedObject var pendingFileOpenCoordinator: PendingFileOpenCoordinator
+    @EnvironmentObject private var themeState: ThemeState
     @ObservedObject var findCommandBindings: FindCommandBindings
     @Environment(\.documentChromeController) private var documentChromeController
-    @Environment(\.colorScheme) private var colorScheme
-    @AppStorage(AppPreferences.themeKey) private var themePreferenceRawValue =
-        ThemePreference.system.rawValue
 
     /// `EmptyStateView` は `isPresented == false` のとき不透明度 0 になる。初期 false のまま非同期で true にすると
     /// 起動直後ずっと透明のまま白い `NSHostingView` だけが見える。
     @State private var isEmptyStatePresented = true
     @State private var isDropTargeted = false
 
-    private var themePreference: ThemePreference {
-        ThemePreference(rawValue: themePreferenceRawValue) ?? .system
-    }
-
     private var resolvedColorScheme: ColorScheme {
-        themePreference.colorScheme ?? colorScheme
+        themeState.resolvedColorScheme
     }
 
     private var windowTitle: String {
@@ -39,7 +33,7 @@ struct RootView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .preferredColorScheme(themePreference.colorScheme)
+        .preferredColorScheme(themeState.themePreference.colorScheme)
         // Keep command actions at the window root so the active document window owns shortcut state.
         .focusedSceneValue(\.toggleFindBarAction, findCommandBindings.toggleFindBarAction)
         .focusedSceneValue(
@@ -67,10 +61,7 @@ struct RootView: View {
         .onChange(of: documentSession.fileURL?.path ?? "") { _, _ in
             syncDocumentChrome()
         }
-        .onChange(of: themePreferenceRawValue) { _, _ in
-            syncDocumentChrome()
-        }
-        .onChange(of: colorScheme) { _, _ in
+        .onChange(of: themeState.resolvedColorScheme) { _, _ in
             syncDocumentChrome()
         }
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in

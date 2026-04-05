@@ -346,7 +346,8 @@ struct GFMConversionPropertyTests {
             markdownContent: markdown,
             markedJS: "// mock marked.js",
             highlightJS: "// mock highlight.js",
-            css: "/* mock css */"
+            css: "/* mock css */",
+            resolvedTheme: "light"
         )
     }
 
@@ -430,6 +431,7 @@ struct HTMLTemplateUnitTests {
             markedJS: sampleMarkedJS,
             highlightJS: sampleHighlightJS,
             css: sampleCSS,
+            resolvedTheme: "light",
             initialFindQuery: initialFindQuery,
             mermaidJS: mermaidJS
         )
@@ -489,10 +491,12 @@ struct HTMLTemplateUnitTests {
 
     // --- Dark Mode Detection ---
 
-    @Test("Contains prefers-color-scheme media query")
-    func containsDarkModeDetection() {
+    @Test("Contains explicit resolved theme state")
+    func containsResolvedThemeState() {
         let html = buildHTML(from: "test")
-        #expect(html.contains("prefers-color-scheme"))
+        #expect(html.contains("const initialResolvedTheme ="))
+        #expect(html.contains("viewerState.resolvedTheme"))
+        #expect(!html.contains("prefers-color-scheme"))
     }
 
     // --- Message Handlers ---
@@ -588,6 +592,7 @@ struct HTMLTemplateUnitTests {
             markedJS: sampleMarkedJS,
             highlightJS: sampleHighlightJS,
             css: sampleCSS,
+            resolvedTheme: "light",
             documentBaseURL: baseURL
         )
         #expect(html.contains("<base href=\"file:///Users/example/Doc&#39;s/\">"))
@@ -720,6 +725,7 @@ struct WKWebViewIntegrationTests {
             markedJS: ResourceLoader.loadMarkedJS(),
             highlightJS: ResourceLoader.loadHighlightJS(),
             css: ResourceLoader.loadCSS(),
+            resolvedTheme: "light",
             documentBaseURL: baseURL
         )
 
@@ -746,6 +752,7 @@ struct WKWebViewIntegrationTests {
             markedJS: ResourceLoader.loadMarkedJS(),
             highlightJS: ResourceLoader.loadHighlightJS(),
             css: ResourceLoader.loadCSS(),
+            resolvedTheme: "light",
             documentBaseURL: URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
         )
 
@@ -802,6 +809,7 @@ struct WKWebViewIntegrationTests {
             markedJS: ResourceLoader.loadMarkedJS(),
             highlightJS: ResourceLoader.loadHighlightJS(),
             css: ResourceLoader.loadCSS(),
+            resolvedTheme: "light",
             documentBaseURL: baseURL,
             mermaidJS: ResourceLoader.loadMermaidJS()
         )
@@ -846,6 +854,7 @@ struct WKWebViewIntegrationTests {
             markedJS: ResourceLoader.loadMarkedJS(),
             highlightJS: ResourceLoader.loadHighlightJS(),
             css: ResourceLoader.loadCSS(),
+            resolvedTheme: "light",
             documentBaseURL: baseURL,
             mermaidJS: ResourceLoader.loadMermaidJS()
         )
@@ -901,6 +910,7 @@ struct WKWebViewIntegrationTests {
             markedJS: ResourceLoader.loadMarkedJS(),
             highlightJS: ResourceLoader.loadHighlightJS(),
             css: ResourceLoader.loadCSS(),
+            resolvedTheme: "light",
             documentBaseURL: baseURL
         )
 
@@ -1599,6 +1609,17 @@ struct AppPreferencesUnitTests {
         #expect(ThemePreference.dark.colorScheme == .dark)
     }
 
+    @Test("ThemePreference resolves system appearance explicitly")
+    func themePreferenceResolvesSystemAppearance() {
+        let lightAppearance = NSAppearance(named: .aqua)!
+        let darkAppearance = NSAppearance(named: .darkAqua)!
+
+        #expect(ThemePreference.system.resolvedColorScheme(using: lightAppearance) == .light)
+        #expect(ThemePreference.system.resolvedColorScheme(using: darkAppearance) == .dark)
+        #expect(ThemePreference.light.resolvedColorScheme(using: darkAppearance) == .light)
+        #expect(ThemePreference.dark.resolvedColorScheme(using: lightAppearance) == .dark)
+    }
+
     @Test("Text scale is clamped to supported range")
     func textScaleIsClampedToSupportedRange() {
         #expect(AppPreferences.clampedTextScale(0.1) == AppPreferences.textScaleRange.lowerBound)
@@ -2121,7 +2142,8 @@ struct AutolinksPropertyTests {
             markdownContent: markdown,
             markedJS: "// mock marked.js",
             highlightJS: "// mock highlight.js",
-            css: "/* mock css */"
+            css: "/* mock css */",
+            resolvedTheme: "light"
         )
     }
 
@@ -2221,7 +2243,8 @@ struct CodeBlockHighlightingPropertyTests {
             markdownContent: markdown,
             markedJS: "// mock marked.js",
             highlightJS: "// mock highlight.js",
-            css: "/* mock css */"
+            css: "/* mock css */",
+            resolvedTheme: "light"
         )
     }
 

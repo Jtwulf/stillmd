@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 enum ThemePreference: String, CaseIterable, Identifiable {
@@ -28,6 +29,18 @@ enum ThemePreference: String, CaseIterable, Identifiable {
             return .dark
         }
     }
+
+    func resolvedColorScheme(using appearance: NSAppearance) -> ColorScheme {
+        switch self {
+        case .system:
+            let bestMatch = appearance.bestMatch(from: [.darkAqua, .aqua])
+            return bestMatch == .darkAqua ? .dark : .light
+        case .light:
+            return .light
+        case .dark:
+            return .dark
+        }
+    }
 }
 
 enum AppPreferences {
@@ -51,5 +64,16 @@ enum AppPreferences {
 
     static func resetTextScale() -> Double {
         defaultTextScale
+    }
+}
+
+extension ColorScheme {
+    var stillmdThemeName: String {
+        switch self {
+        case .dark:
+            return "dark"
+        default:
+            return "light"
+        }
     }
 }

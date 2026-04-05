@@ -11,12 +11,7 @@ enum WindowDefaults {
 @main
 struct StillmdApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @AppStorage(AppPreferences.themeKey) private var themePreferenceRawValue =
-        ThemePreference.system.rawValue
-
-    private var themePreference: ThemePreference {
-        ThemePreference(rawValue: themePreferenceRawValue) ?? .system
-    }
+    @StateObject private var themeState = ThemeState.shared
 
     private var windowManager: WindowManager {
         appDelegate.windowManager
@@ -25,12 +20,14 @@ struct StillmdApp: App {
     var body: some Scene {
         Settings {
             SettingsView()
-                .preferredColorScheme(themePreference.colorScheme)
+                .environmentObject(themeState)
+                .preferredColorScheme(themeState.themePreference.colorScheme)
         }
         .commands {
             FileCommands(
                 windowManager: windowManager,
-                pendingCoordinator: appDelegate.pendingFileOpenCoordinator
+                pendingCoordinator: appDelegate.pendingFileOpenCoordinator,
+                themeState: themeState
             )
             FindCommands()
             TextScaleCommands()
@@ -44,6 +41,7 @@ struct StillmdApp: App {
 class AppDelegate: NSObject, NSApplicationDelegate {
     let pendingFileOpenCoordinator = PendingFileOpenCoordinator()
     let windowManager = WindowManager()
+    let themeState = ThemeState.shared
 
     private let launchOpenRequestCoordinator = LaunchOpenRequestCoordinator()
     private var livingDocumentWindows: [StillmdDocumentWindow] = []
@@ -65,7 +63,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             DocumentWindowFactory.openDocument(
                 initialURL: url,
                 windowManager: self.windowManager,
-                pendingCoordinator: self.pendingFileOpenCoordinator
+                pendingCoordinator: self.pendingFileOpenCoordinator,
+                themeState: self.themeState
             )
         }
 
@@ -74,7 +73,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if !openPendingLaunchRequests() {
             DocumentWindowFactory.openDocument(
                 windowManager: windowManager,
-                pendingCoordinator: pendingFileOpenCoordinator
+                pendingCoordinator: pendingFileOpenCoordinator,
+                themeState: themeState
             )
         }
 
@@ -85,7 +85,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if !flag {
             DocumentWindowFactory.openDocument(
                 windowManager: windowManager,
-                pendingCoordinator: pendingFileOpenCoordinator
+                pendingCoordinator: pendingFileOpenCoordinator,
+                themeState: themeState
             )
         }
         return true
@@ -107,7 +108,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if !hasDocumentWindow {
             DocumentWindowFactory.openDocument(
                 windowManager: windowManager,
-                pendingCoordinator: pendingFileOpenCoordinator
+                pendingCoordinator: pendingFileOpenCoordinator,
+                themeState: themeState
             )
         }
     }
@@ -119,7 +121,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         DocumentWindowFactory.openDocument(
             initialURL: batch.initialURL,
             windowManager: windowManager,
-            pendingCoordinator: pendingFileOpenCoordinator
+            pendingCoordinator: pendingFileOpenCoordinator,
+            themeState: themeState
         )
 
         for url in batch.remainingURLs {
