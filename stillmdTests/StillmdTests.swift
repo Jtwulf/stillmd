@@ -340,8 +340,7 @@ struct GFMConversionPropertyTests {
             markdownContent: markdown,
             markedJS: "// mock marked.js",
             highlightJS: "// mock highlight.js",
-            css: "/* mock css */",
-            resolvedTheme: "light"
+            css: "/* mock css */"
         )
     }
 
@@ -425,7 +424,6 @@ struct HTMLTemplateUnitTests {
             markedJS: sampleMarkedJS,
             highlightJS: sampleHighlightJS,
             css: sampleCSS,
-            resolvedTheme: "light",
             initialFindQuery: initialFindQuery,
             mermaidJS: mermaidJS
         )
@@ -483,14 +481,20 @@ struct HTMLTemplateUnitTests {
         #expect(!HTMLTemplate.containsMermaidFence(in: "```swift\nlet x = 1\n```"))
     }
 
-    // --- Dark Mode Detection ---
+    // --- Theme Selection ---
 
-    @Test("Contains explicit resolved theme state")
-    func containsResolvedThemeState() {
+    @Test("Does not contain prefers-color-scheme media query")
+    func doesNotContainDarkModeDetection() {
         let html = buildHTML(from: "test")
-        #expect(html.contains("const initialResolvedTheme ="))
-        #expect(html.contains("viewerState.resolvedTheme"))
         #expect(!html.contains("prefers-color-scheme"))
+    }
+
+    @Test("Contains explicit theme preference state")
+    func containsThemePreferenceState() {
+        let html = buildHTML(from: "test")
+        #expect(html.contains("const initialThemePreference ="))
+        #expect(html.contains("viewerState.themePreference"))
+        #expect(!html.contains("resolvedTheme"))
     }
 
     // --- Message Handlers ---
@@ -586,7 +590,6 @@ struct HTMLTemplateUnitTests {
             markedJS: sampleMarkedJS,
             highlightJS: sampleHighlightJS,
             css: sampleCSS,
-            resolvedTheme: "light",
             documentBaseURL: baseURL
         )
         #expect(html.contains("<base href=\"file:///Users/example/Doc&#39;s/\">"))
@@ -689,7 +692,6 @@ struct WKWebViewIntegrationTests {
             markedJS: ResourceLoader.loadMarkedJS(),
             highlightJS: ResourceLoader.loadHighlightJS(),
             css: ResourceLoader.loadCSS(),
-            resolvedTheme: "light",
             documentBaseURL: baseURL
         )
 
@@ -716,7 +718,6 @@ struct WKWebViewIntegrationTests {
             markedJS: ResourceLoader.loadMarkedJS(),
             highlightJS: ResourceLoader.loadHighlightJS(),
             css: ResourceLoader.loadCSS(),
-            resolvedTheme: "light",
             documentBaseURL: URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
         )
 
@@ -773,7 +774,6 @@ struct WKWebViewIntegrationTests {
             markedJS: ResourceLoader.loadMarkedJS(),
             highlightJS: ResourceLoader.loadHighlightJS(),
             css: ResourceLoader.loadCSS(),
-            resolvedTheme: "light",
             documentBaseURL: baseURL,
             mermaidJS: ResourceLoader.loadMermaidJS()
         )
@@ -818,7 +818,6 @@ struct WKWebViewIntegrationTests {
             markedJS: ResourceLoader.loadMarkedJS(),
             highlightJS: ResourceLoader.loadHighlightJS(),
             css: ResourceLoader.loadCSS(),
-            resolvedTheme: "light",
             documentBaseURL: baseURL,
             mermaidJS: ResourceLoader.loadMermaidJS()
         )
@@ -874,7 +873,6 @@ struct WKWebViewIntegrationTests {
             markedJS: ResourceLoader.loadMarkedJS(),
             highlightJS: ResourceLoader.loadHighlightJS(),
             css: ResourceLoader.loadCSS(),
-            resolvedTheme: "light",
             documentBaseURL: baseURL
         )
 
@@ -1677,9 +1675,11 @@ struct ResourceLoaderCachingTests {
 @Suite("AppPreferences Unit Tests")
 struct AppPreferencesUnitTests {
 
-    @Test("ThemePreference system uses nil color scheme")
-    func themePreferenceSystemUsesNilColorScheme() {
-        #expect(ThemePreference.system.colorScheme == nil)
+    @Test("ThemePreference exposes only light and dark")
+    func themePreferenceExposesOnlyConcreteSchemes() {
+        #expect(ThemePreference.allCases == [.light, .dark])
+        #expect(ThemePreference.light.colorScheme == .light)
+        #expect(ThemePreference.dark.colorScheme == .dark)
     }
 
     @Test("ThemePreference light and dark map to matching schemes")
@@ -1688,23 +1688,25 @@ struct AppPreferencesUnitTests {
         #expect(ThemePreference.dark.colorScheme == .dark)
     }
 
-    @Test("ThemePreference resolves system appearance explicitly")
-    func themePreferenceResolvesSystemAppearance() {
-        let lightAppearance = NSAppearance(named: .aqua)!
-        let darkAppearance = NSAppearance(named: .darkAqua)!
-
-        #expect(ThemePreference.system.resolvedColorScheme(using: lightAppearance) == .light)
-        #expect(ThemePreference.system.resolvedColorScheme(using: darkAppearance) == .dark)
-        #expect(ThemePreference.light.resolvedColorScheme(using: darkAppearance) == .light)
-        #expect(ThemePreference.dark.resolvedColorScheme(using: lightAppearance) == .dark)
+    @Test("Legacy system theme raw value normalizes to a concrete scheme")
+    func legacySystemThemeNormalizesToConcreteScheme() {
+        #expect(
+            ThemePreference.normalized(
+                from: ThemePreference.legacySystemRawValue,
+                fallbackAppearance: NSAppearance(named: .darkAqua)
+            ) == .dark
+        )
+        #expect(
+            ThemePreference.normalized(
+                from: ThemePreference.legacySystemRawValue,
+                fallbackAppearance: NSAppearance(named: .aqua)
+            ) == .light
+        )
     }
 
-    @Test("ThemePreference resolves system color scheme from view environment")
-    func themePreferenceResolvesSystemColorScheme() {
-        #expect(ThemePreference.system.resolvedColorScheme(using: .light) == .light)
-        #expect(ThemePreference.system.resolvedColorScheme(using: .dark) == .dark)
-        #expect(ThemePreference.light.resolvedColorScheme(using: .dark) == .light)
-        #expect(ThemePreference.dark.resolvedColorScheme(using: .light) == .dark)
+    @Test("Invalid theme raw values fall back to light")
+    func invalidThemeRawValuesFallBackToLight() {
+        #expect(ThemePreference.normalized(from: "unknown") == .light)
     }
 
     @Test("Text scale is clamped to supported range")
@@ -2211,8 +2213,7 @@ struct AutolinksPropertyTests {
             markdownContent: markdown,
             markedJS: "// mock marked.js",
             highlightJS: "// mock highlight.js",
-            css: "/* mock css */",
-            resolvedTheme: "light"
+            css: "/* mock css */"
         )
     }
 
@@ -2312,8 +2313,7 @@ struct CodeBlockHighlightingPropertyTests {
             markdownContent: markdown,
             markedJS: "// mock marked.js",
             highlightJS: "// mock highlight.js",
-            css: "/* mock css */",
-            resolvedTheme: "light"
+            css: "/* mock css */"
         )
     }
 

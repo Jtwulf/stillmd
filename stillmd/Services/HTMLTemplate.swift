@@ -14,8 +14,7 @@ enum HTMLTemplate {
         highlightJS: String,
         css: String,
         initialScrollPosition: Double = 0,
-        themePreference: String = ThemePreference.system.rawValue,
-        resolvedTheme: String,
+        themePreference: String = ThemePreference.defaultPreference.rawValue,
         textScale: Double = AppPreferences.defaultTextScale,
         documentBaseURL: URL? = nil,
         initialFindQuery: String = "",
@@ -25,9 +24,6 @@ enum HTMLTemplate {
         // or being interpreted as JS (template literals / unterminated strings → blank WebView).
         let markdownBase64 = Data(markdownContent.utf8).base64EncodedString()
         let escapedThemePreference = themePreference
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-        let escapedResolvedThemeValue = resolvedTheme
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
         let escapedInitialFindQuery = initialFindQuery
@@ -108,12 +104,10 @@ enum HTMLTemplate {
                 const linkClickedHandler = messageHandlers.linkClicked ?? null;
                 const initialScrollY = \(initialScrollPosition);
                 const initialThemePreference = "\(escapedThemePreference)";
-                const initialResolvedTheme = "\(escapedResolvedThemeValue)";
                 const initialTextScale = \(textScale);
                 const initialFindQuery = "\(escapedInitialFindQuery)";
                 const viewerState = {
                     themePreference: initialThemePreference,
-                    resolvedTheme: initialResolvedTheme,
                     findQuery: initialFindQuery,
                 };
                 let findMatches = [];
@@ -232,7 +226,7 @@ enum HTMLTemplate {
                 }
 
                 function getResolvedMermaidTheme() {
-                    return viewerState.resolvedTheme === 'dark' ? 'dark' : 'default';
+                    return viewerState.themePreference === 'dark' ? 'dark' : 'default';
                 }
 
                 function configureMermaid() {
@@ -492,16 +486,15 @@ enum HTMLTemplate {
                 }
 
                 function applyTheme() {
-                    document.documentElement.setAttribute('data-theme', viewerState.resolvedTheme);
+                    document.documentElement.setAttribute('data-theme', viewerState.themePreference);
                     document.documentElement.setAttribute(
                         'data-theme-preference',
                         viewerState.themePreference
                     );
                 }
 
-                function setThemePreference(nextThemePreference, nextResolvedTheme) {
-                    viewerState.themePreference = nextThemePreference || 'system';
-                    viewerState.resolvedTheme = nextResolvedTheme || 'light';
+                function setThemePreference(nextThemePreference) {
+                    viewerState.themePreference = nextThemePreference === 'dark' ? 'dark' : 'light';
                     applyTheme();
                     void renderMermaidBlocks();
                 }
@@ -528,7 +521,7 @@ enum HTMLTemplate {
                 });
 
                 window.__stillmdBootPhase = 'theme-ready';
-                setThemePreference(initialThemePreference, initialResolvedTheme);
+                setThemePreference(initialThemePreference);
                 setTextScale(initialTextScale);
 
                 let scrollState = { pending: false };
