@@ -164,7 +164,8 @@ enum HTMLTemplate {
 
                     const language = getCodeLanguage(codeElement);
                     const rawText = codeElement.textContent || '';
-                    const lines = rawText.split(/\\r?\\n/);
+                    const normalizedText = rawText.replace(/\\r?\\n$/, '');
+                    const lines = normalizedText.split(/\\r?\\n/);
 
                     const block = document.createElement('div');
                     block.className = 'stillmd-code-block';
