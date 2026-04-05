@@ -533,6 +533,13 @@ struct HTMLTemplateUnitTests {
         #expect(html.contains("function decorateCodeBlocks"))
     }
 
+    @Test("Code block renderer normalizes only the terminal parser newline")
+    func codeBlockRendererNormalizesOnlyTerminalParserNewline() {
+        let html = buildHTML(from: "```text\nline 01\n```")
+        #expect(html.contains("const normalizedText = rawText.replace(/\\r?\\n$/, '');"))
+        #expect(html.contains("const lines = normalizedText.split(/\\r?\\n/);"))
+    }
+
     // --- External Link Interception ---
 
     @Test("Contains click event listener for external links")
@@ -590,6 +597,35 @@ struct WKWebViewConfigurationUnitTests {
 @Suite("WKWebView Integration Tests")
 @MainActor
 struct WKWebViewIntegrationTests {
+
+    private func renderedCodeLineCount(from markdown: String) async throws -> Int {
+        let configuration = StillmdWebViewConfiguration.make(
+            userContentController: WKUserContentController()
+        )
+        let webView = WKWebView(
+            frame: NSRect(x: 0, y: 0, width: 900, height: 900),
+            configuration: configuration
+        )
+        let probe = WKNavigationProbe()
+        let baseURL = URL(
+            fileURLWithPath: FileManager.default.currentDirectoryPath,
+            isDirectory: true
+        )
+        let html = HTMLTemplate.build(
+            markdownContent: markdown,
+            markedJS: ResourceLoader.loadMarkedJS(),
+            highlightJS: ResourceLoader.loadHighlightJS(),
+            css: ResourceLoader.loadCSS(),
+            documentBaseURL: baseURL
+        )
+
+        try await probe.loadHTML(in: webView, html: html, baseURL: baseURL)
+
+        return try await evaluateJavaScriptInt(
+            "document.querySelectorAll('.stillmd-code-line').length",
+            in: webView
+        )
+    }
 
     @Test("Inline HTML still renders markdown without registered message handlers")
     func inlineHTMLRendersWithoutMessageHandlers() async throws {
@@ -718,6 +754,25 @@ struct WKWebViewIntegrationTests {
             #expect(heightDiff < 0.75, "Code line number height should match code row height")
             #expect(topDiff < 0.75, "Code line number top should match code row top")
         }
+    }
+
+    @Test("Code block rows keep internal blank lines but drop only the parser trailing newline")
+    func codeBlockRowsKeepIntentionalBlankLines() async throws {
+        let trailingNewlineOnly = """
+        ```text
+        line 01
+        ```
+        """
+        let internalBlankLine = """
+        ```text
+        line 01
+
+        line 03
+        ```
+        """
+
+        #expect(try await renderedCodeLineCount(from: trailingNewlineOnly) == 1)
+        #expect(try await renderedCodeLineCount(from: internalBlankLine) == 3)
     }
 }
 
