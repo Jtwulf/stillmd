@@ -3,10 +3,10 @@ import SwiftUI
 struct PreviewView: View {
     let fileURL: URL
     @ObservedObject var windowManager: WindowManager
+    @ObservedObject var findCommandBindings: FindCommandBindings
     @StateObject private var viewModel: PreviewViewModel
+    @EnvironmentObject private var themeState: ThemeState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage(AppPreferences.themeKey) private var themePreferenceRawValue =
-        ThemePreference.defaultPreference.rawValue
     @AppStorage(AppPreferences.textScaleKey) private var textScale = AppPreferences.defaultTextScale
 
     @State private var isFindBarPresented = false
@@ -15,23 +15,24 @@ struct PreviewView: View {
     @State private var findRequest: FindRequest?
     @State private var findRequestID = 0
     @State private var isFindBarChromeReserved = false
-    @State private var isDocumentLineNumbersPresented = false
     @State private var pendingFindResetTask: Task<Void, Never>?
     @State private var isPreviewRevealed = false
     @State private var previewRevealScheduleID = 0
     @State private var webRevealFallbackTask: Task<Void, Never>?
 
-    init(fileURL: URL, windowManager: WindowManager) {
+    init(
+        fileURL: URL,
+        windowManager: WindowManager,
+        findCommandBindings: FindCommandBindings
+    ) {
         self.fileURL = fileURL
         self.windowManager = windowManager
+        self.findCommandBindings = findCommandBindings
         _viewModel = StateObject(wrappedValue: PreviewViewModel(fileURL: fileURL))
     }
 
     private var themePreference: ThemePreference {
-        ThemePreference.normalized(
-            from: themePreferenceRawValue,
-            fallbackAppearance: NSApp.effectiveAppearance
-        )
+        themeState.themePreference
     }
 
     private var shouldKeepPreviewVisible: Bool {
@@ -63,6 +64,23 @@ struct PreviewView: View {
             // Register this file in WindowManager for duplicate detection,
             // regardless of how the window was created (Finder, Dock, NSWorkspace, etc.)
             windowManager.registerFile(fileURL)
+            findCommandBindings.installPreviewActions(
+                toggleFindBar: toggleFindBar,
+                findNext: {
+                    if !isFindBarPresented {
+                        presentFindBar()
+                        return
+                    }
+                    triggerFind(.next)
+                },
+                findPrevious: {
+                    if !isFindBarPresented {
+                        presentFindBar()
+                        return
+                    }
+                    triggerFind(.previous)
+                }
+            )
             viewModel.startWatching()
             // `shouldKeepPreviewVisible == true` のとき従来はここで schedule していなかったため、
             // `didCommit` が来ない環境だと `isPreviewRevealed` が永遠に false のまま真っ白になる。
@@ -76,31 +94,13 @@ struct PreviewView: View {
         .onDisappear {
             pendingFindResetTask?.cancel()
             webRevealFallbackTask?.cancel()
+            findCommandBindings.clearPreviewActions()
             viewModel.stopWatching()
             windowManager.closeFile(fileURL)
         }
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
             handleDrop(providers)
         }
-        .focusedSceneValue(\.toggleFindBarAction, FindAction(perform: toggleFindBar))
-        .focusedSceneValue(
-            \.toggleDocumentLineNumbersAction,
-            FindAction(perform: toggleDocumentLineNumbers)
-        )
-        .focusedSceneValue(\.findNextAction, FindAction(perform: {
-            if !isFindBarPresented {
-                presentFindBar()
-                return
-            }
-            triggerFind(.next)
-        }))
-        .focusedSceneValue(\.findPreviousAction, FindAction(perform: {
-            if !isFindBarPresented {
-                presentFindBar()
-                return
-            }
-            triggerFind(.previous)
-        }))
         .onExitCommand {
             guard isFindBarPresented else { return }
             dismissFindBar()
@@ -113,11 +113,11 @@ struct PreviewView: View {
             if shouldKeepPreviewVisible {
                 MarkdownWebView(
                     markdownContent: viewModel.markdownContent,
+                    containsMermaidFence: viewModel.containsMermaidFence,
                     baseURL: fileURL.deletingLastPathComponent(),
                     scrollPosition: $viewModel.scrollPosition,
                     themePreference: themePreference,
                     textScale: AppPreferences.clampedTextScale(textScale),
-                    documentLineNumbersVisible: isDocumentLineNumbersPresented,
                     findQuery: findQuery,
                     findRequest: findRequest,
                     findStatus: $findStatus,
@@ -241,10 +241,6 @@ struct PreviewView: View {
             isFindBarPresented = false
         }
         scheduleFindReset()
-    }
-
-    private func toggleDocumentLineNumbers() {
-        isDocumentLineNumbersPresented.toggle()
     }
 
     private func triggerFind(_ direction: FindDirection) {

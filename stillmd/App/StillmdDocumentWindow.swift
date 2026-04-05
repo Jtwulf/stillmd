@@ -5,15 +5,18 @@ import SwiftUI
 @MainActor
 final class StillmdDocumentWindow: NSWindow, NSWindowDelegate {
     let session: DocumentWindowSession
+    let findCommandBindings: FindCommandBindings
     let chromeController: DocumentWindowChromeController
 
     init(
         initialFileURL: URL?,
         windowManager: WindowManager,
-        pendingCoordinator: PendingFileOpenCoordinator
+        pendingCoordinator: PendingFileOpenCoordinator,
+        themeState: ThemeState
     ) {
         let session = DocumentWindowSession(fileURL: initialFileURL)
         self.session = session
+        self.findCommandBindings = FindCommandBindings()
         self.chromeController = DocumentWindowChromeController()
 
         let rect = NSRect(
@@ -36,7 +39,7 @@ final class StillmdDocumentWindow: NSWindow, NSWindowDelegate {
         minSize = NSSize(width: WindowDefaults.minimumWidth, height: WindowDefaults.minimumHeight)
 
         let initialTitle = initialFileURL?.lastPathComponent ?? "stillmd"
-        let initialScheme = DocumentWindowChromeBootstrap.initialColorSchemeForNewWindow()
+        let initialScheme = themeState.themePreference.colorScheme
 
         chromeController.attach(
             window: self,
@@ -49,8 +52,10 @@ final class StillmdDocumentWindow: NSWindow, NSWindowDelegate {
         let rootView = RootView(
             documentSession: session,
             windowManager: windowManager,
-            pendingFileOpenCoordinator: pendingCoordinator
+            pendingFileOpenCoordinator: pendingCoordinator,
+            findCommandBindings: findCommandBindings
         )
+        .environmentObject(themeState)
         .environment(\.documentChromeController, chromeController)
 
         let hostingView = NSHostingView(rootView: rootView)
@@ -80,12 +85,14 @@ enum DocumentWindowFactory {
     static func openDocument(
         initialURL: URL? = nil,
         windowManager: WindowManager,
-        pendingCoordinator: PendingFileOpenCoordinator
+        pendingCoordinator: PendingFileOpenCoordinator,
+        themeState: ThemeState
     ) {
         let window = StillmdDocumentWindow(
             initialFileURL: initialURL,
             windowManager: windowManager,
-            pendingCoordinator: pendingCoordinator
+            pendingCoordinator: pendingCoordinator,
+            themeState: themeState
         )
         guard let appDelegate = NSApplication.shared.delegate as? AppDelegate else { return }
         appDelegate.trackDocumentWindow(window)

@@ -1,20 +1,50 @@
 import Foundation
 
 enum ResourceLoader {
+    private static let markedLock = NSLock()
+    private static let highlightLock = NSLock()
+    private static let mermaidLock = NSLock()
+    private static let cssLock = NSLock()
+
+    nonisolated(unsafe) private static var markedCache: String?
+    nonisolated(unsafe) private static var highlightCache: String?
+    nonisolated(unsafe) private static var mermaidCache: String?
+    nonisolated(unsafe) private static var cssCache: String?
+
     static func loadMarkedJS() -> String {
-        loadBundleResource(name: "marked.min", ext: "js")
+        markedLock.lock()
+        defer { markedLock.unlock() }
+        if let markedCache { return markedCache }
+        let loaded = loadBundleResource(name: "marked.min", ext: "js")
+        markedCache = loaded
+        return loaded
     }
 
     static func loadHighlightJS() -> String {
-        loadBundleResource(name: "highlight.min", ext: "js")
+        highlightLock.lock()
+        defer { highlightLock.unlock() }
+        if let highlightCache { return highlightCache }
+        let loaded = loadBundleResource(name: "highlight.min", ext: "js")
+        highlightCache = loaded
+        return loaded
     }
 
     static func loadMermaidJS() -> String {
-        loadBundleResource(name: "mermaid.min", ext: "js")
+        mermaidLock.lock()
+        defer { mermaidLock.unlock() }
+        if let mermaidCache { return mermaidCache }
+        let loaded = loadBundleResource(name: "mermaid.min", ext: "js")
+        mermaidCache = loaded
+        return loaded
     }
 
     static func loadCSS() -> String {
-        loadBundleResource(name: "preview", ext: "css")
+        cssLock.lock()
+        defer { cssLock.unlock() }
+        if let cssCache { return cssCache }
+        let loaded = loadBundleResource(name: "preview", ext: "css")
+        cssCache = loaded
+        return loaded
     }
 
     private static func loadBundleResource(name: String, ext: String) -> String {

@@ -187,15 +187,3 @@ final class DocumentWindowChromeController: NSObject {
     }
 
 }
-
-enum DocumentWindowChromeBootstrap {
-    /// Theme before SwiftUI `RootView` runs (UserDefaults + effective appearance).
-    @MainActor
-    static func initialColorSchemeForNewWindow() -> ColorScheme {
-        let raw = UserDefaults.standard.string(forKey: AppPreferences.themeKey)
-        return ThemePreference.normalized(
-            from: raw ?? ThemePreference.defaultPreference.rawValue,
-            fallbackAppearance: NSApp.effectiveAppearance
-        ).colorScheme
-    }
-}

@@ -4,9 +4,9 @@ struct RootView: View {
     @ObservedObject var documentSession: DocumentWindowSession
     @ObservedObject var windowManager: WindowManager
     @ObservedObject var pendingFileOpenCoordinator: PendingFileOpenCoordinator
+    @EnvironmentObject private var themeState: ThemeState
+    @ObservedObject var findCommandBindings: FindCommandBindings
     @Environment(\.documentChromeController) private var documentChromeController
-    @AppStorage(AppPreferences.themeKey) private var themePreferenceRawValue =
-        ThemePreference.defaultPreference.rawValue
 
     /// `EmptyStateView` は `isPresented == false` のとき不透明度 0 になる。初期 false のまま非同期で true にすると
     /// 起動直後ずっと透明のまま白い `NSHostingView` だけが見える。
@@ -14,10 +14,7 @@ struct RootView: View {
     @State private var isDropTargeted = false
 
     private var themePreference: ThemePreference {
-        ThemePreference.normalized(
-            from: themePreferenceRawValue,
-            fallbackAppearance: NSApp.effectiveAppearance
-        )
+        themeState.themePreference
     }
 
     private var windowTitle: String {
@@ -29,14 +26,15 @@ struct RootView: View {
             WindowSurfacePalette.background(for: themePreference.colorScheme)
                 .ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                Color.clear.frame(height: 28)
-                rootContent
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
+            rootContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .preferredColorScheme(themePreference.colorScheme)
+        // Keep command actions at the window root so the active document window owns shortcut state.
+        .focusedSceneValue(\.toggleFindBarAction, findCommandBindings.toggleFindBarAction)
+        .focusedSceneValue(\.findNextAction, findCommandBindings.findNextAction)
+        .focusedSceneValue(\.findPreviousAction, findCommandBindings.findPreviousAction)
         .onAppear {
             if documentSession.fileURL != nil {
                 isEmptyStatePresented = false
@@ -56,7 +54,7 @@ struct RootView: View {
         .onChange(of: documentSession.fileURL?.path ?? "") { _, _ in
             syncDocumentChrome()
         }
-        .onChange(of: themePreferenceRawValue) { _, _ in
+        .onChange(of: themeState.themePreference) { _, _ in
             syncDocumentChrome()
         }
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
@@ -69,7 +67,11 @@ struct RootView: View {
     @ViewBuilder
     private var rootContent: some View {
         if let url = documentSession.fileURL {
-            PreviewView(fileURL: url, windowManager: windowManager)
+            PreviewView(
+                fileURL: url,
+                windowManager: windowManager,
+                findCommandBindings: findCommandBindings
+            )
                 // New `PreviewView` + `StateObject` per file so URL changes reload the document and replay preview reveal.
                 .id(url.standardizedFileURL.path)
         } else {

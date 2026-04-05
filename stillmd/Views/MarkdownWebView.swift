@@ -3,6 +3,13 @@ import SwiftUI
 import WebKit
 
 enum StillmdWebViewLogger {
+    /// Layout / render diagnostics; omitted in release to reduce stderr churn.
+    static func logDiagnostic(_ message: String) {
+        #if DEBUG
+        fputs("[stillmd][WKWebView] \(message)\n", stderr)
+        #endif
+    }
+
     static func log(_ message: String) {
         fputs("[stillmd][WKWebView] \(message)\n", stderr)
     }
@@ -60,18 +67,19 @@ final class StillmdMarkdownWebContainerView: NSView {
         super.layout()
         webView.frame = bounds
         if bounds.width < 1 || bounds.height < 1 {
-            StillmdWebViewLogger.log("container laid out with tiny bounds: \(bounds.debugDescription)")
+            StillmdWebViewLogger.logDiagnostic("container laid out with tiny bounds: \(bounds.debugDescription)")
         }
     }
 }
 
 struct MarkdownWebView: NSViewRepresentable {
     let markdownContent: String
+    /// Precomputed in `PreviewViewModel` when markdown changes; avoids duplicate full-document regex scans.
+    let containsMermaidFence: Bool
     let baseURL: URL
     @Binding var scrollPosition: CGFloat
     let themePreference: ThemePreference
     let textScale: Double
-    let documentLineNumbersVisible: Bool
     let findQuery: String
     let findRequest: FindRequest?
     @Binding var findStatus: FindStatus
@@ -94,7 +102,6 @@ struct MarkdownWebView: NSViewRepresentable {
         webView.setValue(true, forKey: "drawsBackground")
         webView.wantsLayer = true
 
-        let containsMermaidFence = HTMLTemplate.containsMermaidFence(in: markdownContent)
         let html = HTMLTemplate.build(
             markdownContent: markdownContent,
             markedJS: ResourceLoader.loadMarkedJS(),
@@ -103,7 +110,6 @@ struct MarkdownWebView: NSViewRepresentable {
             initialScrollPosition: Double(scrollPosition),
             themePreference: themePreference.rawValue,
             textScale: textScale,
-            documentLineNumbersVisible: documentLineNumbersVisible,
             documentBaseURL: baseURL,
             initialFindQuery: findQuery,
             mermaidJS: containsMermaidFence ? ResourceLoader.loadMermaidJS() : nil
@@ -113,7 +119,6 @@ struct MarkdownWebView: NSViewRepresentable {
         context.coordinator.lastContent = markdownContent
         context.coordinator.lastThemePreference = themePreference.rawValue
         context.coordinator.lastTextScale = textScale
-        context.coordinator.lastDocumentLineNumbersVisible = documentLineNumbersVisible
         context.coordinator.lastFindQuery = findQuery
         context.coordinator.lastContainsMermaidFence = containsMermaidFence
 
@@ -137,8 +142,6 @@ struct MarkdownWebView: NSViewRepresentable {
     func updateNSView(_ container: StillmdMarkdownWebContainerView, context: Context) {
         let webView = container.webView
         context.coordinator.parent = self
-        let containsMermaidFence = HTMLTemplate.containsMermaidFence(in: markdownContent)
-
         guard markdownContent != context.coordinator.lastContent else {
             applyAppearanceAndFindState(to: webView, context: context)
             return
@@ -148,7 +151,6 @@ struct MarkdownWebView: NSViewRepresentable {
             context.coordinator.lastContent = markdownContent
             context.coordinator.lastThemePreference = themePreference.rawValue
             context.coordinator.lastTextScale = textScale
-            context.coordinator.lastDocumentLineNumbersVisible = documentLineNumbersVisible
             context.coordinator.lastFindQuery = findQuery
             context.coordinator.lastContainsMermaidFence = containsMermaidFence
 
@@ -160,7 +162,6 @@ struct MarkdownWebView: NSViewRepresentable {
                 initialScrollPosition: Double(scrollPosition),
                 themePreference: themePreference.rawValue,
                 textScale: textScale,
-                documentLineNumbersVisible: documentLineNumbersVisible,
                 documentBaseURL: baseURL,
                 initialFindQuery: findQuery,
                 mermaidJS: containsMermaidFence ? ResourceLoader.loadMermaidJS() : nil
@@ -195,14 +196,6 @@ struct MarkdownWebView: NSViewRepresentable {
         if context.coordinator.lastTextScale != clampedTextScale {
             context.coordinator.lastTextScale = clampedTextScale
             evaluateJavaScript("setTextScale(\(clampedTextScale));", in: webView)
-        }
-
-        if context.coordinator.lastDocumentLineNumbersVisible != documentLineNumbersVisible {
-            context.coordinator.lastDocumentLineNumbersVisible = documentLineNumbersVisible
-            evaluateJavaScript(
-                "setDocumentLineNumbersVisible(\(documentLineNumbersVisible));",
-                in: webView
-            )
         }
 
         if context.coordinator.lastFindQuery != findQuery {
@@ -247,7 +240,6 @@ struct MarkdownWebView: NSViewRepresentable {
         var lastContent: String = ""
         var lastThemePreference: String = ThemePreference.defaultPreference.rawValue
         var lastTextScale: Double = AppPreferences.defaultTextScale
-        var lastDocumentLineNumbersVisible: Bool = false
         var lastFindQuery: String = ""
         var lastFindRequestID: Int?
         var lastContainsMermaidFence: Bool = false
@@ -315,7 +307,7 @@ struct MarkdownWebView: NSViewRepresentable {
 
             webView.evaluateJavaScript(script) { [weak self] value, error in
                 if let error {
-                    StillmdWebViewLogger.log("diagnostic probe failed: \(error.localizedDescription)")
+                    StillmdWebViewLogger.logDiagnostic("diagnostic probe failed: \(error.localizedDescription)")
                     return
                 }
 
@@ -328,7 +320,7 @@ struct MarkdownWebView: NSViewRepresentable {
                         .map { "\($0.key)=\($0.value)" }
                         .joined(separator: ", ")
                     let fileName = self?.parent.baseURL.lastPathComponent ?? "unknown"
-                    StillmdWebViewLogger.log("suspicious render state for \(fileName): \(summary)")
+                    StillmdWebViewLogger.logDiagnostic("suspicious render state for \(fileName): \(summary)")
                 }
             }
         }
