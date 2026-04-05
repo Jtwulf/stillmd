@@ -1,4 +1,4 @@
-# stillmd 一般公開整備 / GitHub Releases 配布 / 全面改名 実装計画書
+# stillmd 一般公開整備 / GitHub Releases ZIP 配布 / 全面改名 実装計画書
 
 ## 概要
 
@@ -10,22 +10,22 @@ stillmd は preview-only / ミニマル / 静けさを重視する macOS 向け 
 - `README.md` に `MIT` とあるが、repo 直下に `LICENSE` ファイルが存在しない
 - 同梱している第三者ライブラリ `marked.js` / `highlight.js` の notice 導線がない
 - Issue / PR を受け付ける前提の `.github/` 整備が不足している
-- GitHub Releases で `.app` を配る前提の配布手順・成果物定義が不足している
+- GitHub Releases で `stillmd.app` を含む `.zip` を配る前提の配布手順・成果物定義が不足している
 - repo 名・アプリ名は `stillmd` だが、Step 1 時点では Swift Package / target / module / ディレクトリ名の中心が旧内部名称 `MarkdownPreviewer` のままで、公開名称と内部名称がずれていた
 
-今回の目的は、stillmd を一般公開可能な repository として整え、GitHub Releases で `.app` を配布できる状態に持っていくこと、そして旧内部実装名 `MarkdownPreviewer` を `stillmd` へ全面改名して名称の一貫性を回復することにある。
+今回の目的は、stillmd を一般公開可能な repository として整え、GitHub Releases で `stillmd.app` を含む `.zip` を配布できる状態に持っていくこと、そして旧内部実装名 `MarkdownPreviewer` を `stillmd` へ全面改名して名称の一貫性を回復することにある。
 
 なお、ユーザー確認済み前提は次の通り。
 
 - 公開範囲は一旦すべて公開
 - Issue / PR は受け付ける
 - ライセンスは `MIT`
-- 配布は GitHub Releases で `.app` を配る
+- 配布は GitHub Releases で `stillmd.app` を含む `.zip` を配る
 - Apple Developer Program は**未加入**
 - 改名は表示名だけでなく、Swift Package / target / module / フォルダ名まで**全面改名**
 
 Apple Developer Program 未加入のため、Developer ID 署名および notarization は今回の実装スコープ外とする。
-その代わり、**未署名・未 notarize の `.app` を配布すること**、初回起動時に Gatekeeper 回避手順が必要になりうることを README / Release Notes に明記する。
+その代わり、**未署名・未 notarize の `stillmd.app` を `.zip` にまとめて配布すること**、初回起動時に Gatekeeper 回避手順が必要になりうることを README / Release Notes に明記する。
 
 ---
 
@@ -69,7 +69,7 @@ Apple Developer Program 未加入のため、Developer ID 署名および notari
 ### 1.5 公開時の制約
 
 - Apple Developer Program 未加入のため、Developer ID 署名・notarization・Stapler 前提の完全な macOS 配布体験は今回実現できない
-- ただし GitHub Releases への `.app` または `.zip` 配布自体は可能
+- ただし GitHub Releases への `.zip` 配布自体は可能
 - その場合は、README / Release Notes に「未署名・未 notarize」であることと、必要な起動手順を案内する必要がある
 
 ---
@@ -82,7 +82,7 @@ Apple Developer Program 未加入のため、Developer ID 署名および notari
 - `MIT` ライセンスを正式に適用し、GitHub に認識される状態にする
 - third-party notices を整備し、同梱ライブラリのライセンス責務を果たす
 - Issue / PR を受け付ける前提の `.github/` 整備を行う
-- GitHub Releases で `.app` を配布するための build / packaging / release 手順を定義する
+- GitHub Releases で `stillmd.app` を含む `.zip` を配布するための build / packaging / release 手順を定義する
 - 旧内部名称 `MarkdownPreviewer` を `stillmd` へ全面改名する
 
 ### 2.2 非機能要件
@@ -135,12 +135,27 @@ README は「公開 repo の入口」であり、初見ユーザーが 30 秒で
 
 ### 3.3 Release 配布方針
 
-- GitHub Releases では、ユーザーが扱いやすいように `stillmd.app` を直接置くより、通常は `stillmd-macos.zip` のような zip 化を第一候補とする
+- GitHub Releases では、ユーザーが扱いやすいように `stillmd.app` をまとめた `stillmd-<version>-macos.zip` を第一候補とする
 - Release Notes には以下を明記する
   - 対応 macOS バージョン
   - 未署名・未 notarize であること
   - 初回起動時の回避手順
   - checksum があればその値
+
+### 3.5 Versioning 方針
+
+- 最初の公開版は `v0.1.0` を基本候補とする
+- これは「最初に外へ出す配布点」を作るための番号であって、完成度の宣言ではない
+- 公開直前に大きな変更が残るなら、無理に `v0.0.1` に寄せず `v0.1.0` で区切るほうが整理しやすい
+- 以後は小さな修正なら `v0.1.1`、機能追加なら `v0.2.0` のように進める
+
+### 3.6 ZIP の中身
+
+- 配布物は `stillmd.app` をそのまま zip 化したもの
+- zip の中には、`stillmd.app` バンドルが丸ごと入る
+- ユーザーが触る単位は `.zip` ではなく、その中の `stillmd.app`
+- Release からは `stillmd-<version>-macos.zip` をダウンロードして解凍し、`stillmd.app` を起動する
+- zip にはアプリ本体以外の余計なインストーラやランチャーは含めない
 
 ### 3.4 改名方針
 
@@ -225,7 +240,7 @@ README は「公開 repo の入口」であり、初見ユーザーが 30 秒で
 - [x] `README.md` 冒頭を stillmd の価値説明中心に再構成した
 - [x] README に image 導線として app icon を追加した
 - [x] README に `Why stillmd` / `Non-goals` を入れ、preview-only の境界を明確にした
-- [x] README に install 方法として GitHub Releases 導線を追加した
+- [x] README に install 方法として GitHub Releases ZIP 導線を追加した
 - [x] README に source build 手順を、改名後の package / target 名に合わせて更新した
 - [x] README に unsigned / unnotarized app の注意事項を追加した
 - [x] README に issue / PR 歓迎の導線を追加した
@@ -259,7 +274,7 @@ README は「公開 repo の入口」であり、初見ユーザーが 30 秒で
 - [x] 脆弱性報告導線が存在する
 - [x] 公開 repo に不要なローカルノイズが整理されている
 
-### Phase 5: GitHub Releases 用の packaging 導線を整備する
+### Phase 5: GitHub Releases 用の ZIP packaging 導線を整備する
 
 目的: ユーザーが実際に試せる配布成果物を一貫した手順で作れるようにする
 
