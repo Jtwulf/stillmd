@@ -13,6 +13,8 @@ class PreviewViewModel: ObservableObject {
     private var fileWatcher: FileWatcher?
     private var recoveryTask: Task<Void, Never>?
     private var modifiedDebounceTask: Task<Void, Never>?
+    /// Bumped on each new debounced schedule so a superseded task does not clear the active task or run `loadFile`.
+    private var modifiedDebounceGeneration: UInt64 = 0
     /// Coalesce rapid `.modified` events from editors (see `docs/plans/STILLMD_PERFORMANCE_REFACTOR_IMPLEMENTATION_PLAN.md`).
     private let modifiedDebounce: Duration = .milliseconds(100)
     /// `NSOpenPanel` / sandbox user-selected files need a matching `stopAccessing…` in `deinit`.
@@ -82,11 +84,15 @@ class PreviewViewModel: ObservableObject {
 
     private func scheduleDebouncedLoadFromDisk() {
         modifiedDebounceTask?.cancel()
+        modifiedDebounceGeneration += 1
+        let generation = modifiedDebounceGeneration
         let delay = modifiedDebounce
-        modifiedDebounceTask = Task { [weak self] in
+        modifiedDebounceTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: delay)
-            guard !Task.isCancelled, let self else { return }
+            guard let self, !Task.isCancelled else { return }
+            guard generation == self.modifiedDebounceGeneration else { return }
             self.loadFile()
+            self.modifiedDebounceTask = nil
         }
     }
 
