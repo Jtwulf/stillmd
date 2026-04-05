@@ -21,7 +21,7 @@ struct StillmdApp: App {
         Settings {
             SettingsView()
                 .environmentObject(themeState)
-                .preferredColorScheme(themeState.resolvedColorScheme)
+                .preferredColorScheme(themeState.themePreference.colorScheme)
         }
         .commands {
             FileCommands(

@@ -32,7 +32,7 @@ struct RootView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .preferredColorScheme(resolvedColorScheme)
+        .preferredColorScheme(themeState.themePreference.colorScheme)
         .onAppear {
             if documentSession.fileURL != nil {
                 isEmptyStatePresented = false
