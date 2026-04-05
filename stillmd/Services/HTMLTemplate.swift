@@ -26,6 +26,9 @@ enum HTMLTemplate {
             let preference = ThemePreference(rawValue: themePreference) ?? .system
             return preference.colorScheme?.stillmdThemeName ?? "light"
         }()
+        let escapedResolvedThemeValue = resolvedThemeValue
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
         let baseTag = documentBaseURL.map { url in
             let href = url.absoluteString
                 .replacingOccurrences(of: "&", with: "&amp;")
@@ -100,7 +103,7 @@ enum HTMLTemplate {
                 const linkClickedHandler = messageHandlers.linkClicked ?? null;
                 const initialScrollY = \(initialScrollPosition);
                 const initialThemePreference = "\(escapedThemePreference)";
-                const initialResolvedTheme = "\(resolvedThemeValue)";
+                const initialResolvedTheme = "\(escapedResolvedThemeValue)";
                 const initialTextScale = \(textScale);
                 const initialDocumentLineNumbersVisible = \(documentLineNumbersVisible ? "true" : "false");
                 const viewerState = {
