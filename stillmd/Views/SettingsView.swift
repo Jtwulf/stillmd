@@ -2,12 +2,17 @@ import SwiftUI
 
 struct SettingsView: View {
     @AppStorage(AppPreferences.themeKey) private var themePreferenceRawValue =
-        ThemePreference.system.rawValue
+        ThemePreference.defaultPreference.rawValue
     @AppStorage(AppPreferences.textScaleKey) private var textScale = AppPreferences.defaultTextScale
 
     private var themePreferenceBinding: Binding<ThemePreference> {
         Binding(
-            get: { ThemePreference(rawValue: themePreferenceRawValue) ?? .system },
+            get: {
+                ThemePreference.normalized(
+                    from: themePreferenceRawValue,
+                    fallbackAppearance: NSApp.effectiveAppearance
+                )
+            },
             set: { themePreferenceRawValue = $0.rawValue }
         )
     }

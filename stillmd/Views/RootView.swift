@@ -5,7 +5,6 @@ struct RootView: View {
     @ObservedObject var windowManager: WindowManager
     @ObservedObject var pendingFileOpenCoordinator: PendingFileOpenCoordinator
     @EnvironmentObject private var themeState: ThemeState
-    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject var findCommandBindings: FindCommandBindings
     @Environment(\.documentChromeController) private var documentChromeController
 
@@ -14,8 +13,8 @@ struct RootView: View {
     @State private var isEmptyStatePresented = true
     @State private var isDropTargeted = false
 
-    private var resolvedColorScheme: ColorScheme {
-        themeState.themePreference.resolvedColorScheme(using: colorScheme)
+    private var themePreference: ThemePreference {
+        themeState.themePreference
     }
 
     private var windowTitle: String {
@@ -24,14 +23,14 @@ struct RootView: View {
 
     var body: some View {
         ZStack {
-            WindowSurfacePalette.background(for: resolvedColorScheme)
+            WindowSurfacePalette.background(for: themePreference.colorScheme)
                 .ignoresSafeArea()
 
             rootContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .preferredColorScheme(themeState.themePreference.colorScheme)
+        .preferredColorScheme(themePreference.colorScheme)
         // Keep command actions at the window root so the active document window owns shortcut state.
         .focusedSceneValue(\.toggleFindBarAction, findCommandBindings.toggleFindBarAction)
         .focusedSceneValue(\.findNextAction, findCommandBindings.findNextAction)
@@ -55,7 +54,7 @@ struct RootView: View {
         .onChange(of: documentSession.fileURL?.path ?? "") { _, _ in
             syncDocumentChrome()
         }
-        .onChange(of: colorScheme) { _, _ in
+        .onChange(of: themeState.themePreference) { _, _ in
             syncDocumentChrome()
         }
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
@@ -89,7 +88,7 @@ struct RootView: View {
     private func syncDocumentChrome() {
         documentChromeController?.syncFromSwiftUI(
             title: windowTitle,
-            colorScheme: resolvedColorScheme,
+            colorScheme: themePreference.colorScheme,
             fileURL: documentSession.fileURL?.standardizedFileURL,
             windowManager: windowManager
         )

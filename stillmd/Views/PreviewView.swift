@@ -6,7 +6,6 @@ struct PreviewView: View {
     @ObservedObject var findCommandBindings: FindCommandBindings
     @StateObject private var viewModel: PreviewViewModel
     @EnvironmentObject private var themeState: ThemeState
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(AppPreferences.textScaleKey) private var textScale = AppPreferences.defaultTextScale
 
@@ -34,10 +33,6 @@ struct PreviewView: View {
 
     private var themePreference: ThemePreference {
         themeState.themePreference
-    }
-
-    private var resolvedColorScheme: ColorScheme {
-        themePreference.resolvedColorScheme(using: colorScheme)
     }
 
     private var shouldKeepPreviewVisible: Bool {
@@ -122,7 +117,6 @@ struct PreviewView: View {
                     baseURL: fileURL.deletingLastPathComponent(),
                     scrollPosition: $viewModel.scrollPosition,
                     themePreference: themePreference,
-                    resolvedColorScheme: resolvedColorScheme,
                     textScale: AppPreferences.clampedTextScale(textScale),
                     findQuery: findQuery,
                     findRequest: findRequest,

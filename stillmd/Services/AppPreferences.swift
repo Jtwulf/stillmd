@@ -2,7 +2,6 @@ import AppKit
 import SwiftUI
 
 enum ThemePreference: String, CaseIterable, Identifiable {
-    case system
     case light
     case dark
 
@@ -10,8 +9,6 @@ enum ThemePreference: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .system:
-            return "System"
         case .light:
             return "Light"
         case .dark:
@@ -19,10 +16,8 @@ enum ThemePreference: String, CaseIterable, Identifiable {
         }
     }
 
-    var colorScheme: ColorScheme? {
+    var colorScheme: ColorScheme {
         switch self {
-        case .system:
-            return nil
         case .light:
             return .light
         case .dark:
@@ -30,27 +25,23 @@ enum ThemePreference: String, CaseIterable, Identifiable {
         }
     }
 
-    func resolvedColorScheme(using appearance: NSAppearance) -> ColorScheme {
-        switch self {
-        case .system:
-            let bestMatch = appearance.bestMatch(from: [.darkAqua, .aqua])
-            return bestMatch == .darkAqua ? .dark : .light
-        case .light:
-            return .light
-        case .dark:
-            return .dark
-        }
-    }
+    static let defaultPreference: ThemePreference = .light
+    static let legacySystemRawValue = "system"
 
-    func resolvedColorScheme(using colorScheme: ColorScheme) -> ColorScheme {
-        switch self {
-        case .system:
-            return colorScheme
-        case .light:
-            return .light
-        case .dark:
-            return .dark
+    static func normalized(
+        from rawValue: String,
+        fallbackAppearance: NSAppearance? = nil
+    ) -> ThemePreference {
+        if let preference = ThemePreference(rawValue: rawValue) {
+            return preference
         }
+
+        if rawValue == legacySystemRawValue {
+            let match = fallbackAppearance?.bestMatch(from: [.darkAqua, .aqua])
+            return match == .darkAqua ? .dark : .light
+        }
+
+        return defaultPreference
     }
 }
 
@@ -76,15 +67,17 @@ enum AppPreferences {
     static func resetTextScale() -> Double {
         defaultTextScale
     }
-}
 
-extension ColorScheme {
-    var stillmdThemeName: String {
-        switch self {
-        case .dark:
-            return "dark"
-        default:
-            return "light"
+    @MainActor
+    static func migrateLegacyThemePreferenceIfNeeded(
+        userDefaults: UserDefaults = .standard,
+        appearance: NSAppearance = NSApp.effectiveAppearance
+    ) -> ThemePreference {
+        let rawValue = userDefaults.string(forKey: themeKey) ?? ThemePreference.defaultPreference.rawValue
+        let preference = ThemePreference.normalized(from: rawValue, fallbackAppearance: appearance)
+        if rawValue != preference.rawValue {
+            userDefaults.set(preference.rawValue, forKey: themeKey)
         }
+        return preference
     }
 }
