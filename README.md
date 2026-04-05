@@ -17,7 +17,6 @@ stillmd is built for reading Markdown, not managing it. It opens local `.md` and
 
 ## What it does
 
-- Opens `.md` and `.markdown` files
 - Renders GitHub Flavored Markdown, Mermaid, and fenced code blocks
 - Resolves relative images and links
 - Auto-reloads when the file changes, preserves scroll position, and supports `⌘F`, theme override, and text scale
@@ -25,13 +24,11 @@ stillmd is built for reading Markdown, not managing it. It opens local `.md` and
 ## What it is not
 
 - Not a text editor
-- Not a workspace app
 - Not a replacement for VS Code, Zed, or Typora
 
 ## Install
 
 - macOS 15 or later
-- Xcode 16 or later for local builds
 
 1. Download the latest `stillmd-<version>-macos.zip` from [Releases](https://github.com/Jtwulf/stillmd/releases).
 2. Unzip the archive.
