@@ -39,5 +39,13 @@ final class TemporaryHTMLDocument {
 
     deinit {
         try? fileManager.removeItem(at: directoryURL)
+
+        if let items = try? fileManager.contentsOfDirectory(
+            at: directoryURL.deletingLastPathComponent(),
+            includingPropertiesForKeys: nil
+        ),
+        items.isEmpty {
+            try? fileManager.removeItem(at: directoryURL.deletingLastPathComponent())
+        }
     }
 }

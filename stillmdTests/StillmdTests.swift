@@ -884,6 +884,7 @@ struct WKWebViewIntegrationTests {
         )
         let probe = WKNavigationProbe()
         let baseURL = StillmdTestPaths.exampleImageDirectory
+        let readAccessRoot = FileManager.default.homeDirectoryForCurrentUser
         let html = HTMLTemplate.build(
             markdownContent: markdown,
             markedJS: ResourceLoader.loadMarkedJS(),
@@ -891,7 +892,7 @@ struct WKWebViewIntegrationTests {
             css: ResourceLoader.loadCSS(),
             documentBaseURL: baseURL
         )
-        let tempHTML = try writeTemporaryHTMLFile(html, rootDirectory: baseURL)
+        let tempHTML = try writeTemporaryHTMLFile(html, rootDirectory: readAccessRoot)
         defer {
             try? FileManager.default.removeItem(at: tempHTML.directoryURL)
         }
@@ -899,7 +900,7 @@ struct WKWebViewIntegrationTests {
         try await probe.loadFile(
             in: webView,
             fileURL: tempHTML.htmlFileURL,
-            allowingReadAccessTo: baseURL
+            allowingReadAccessTo: readAccessRoot
         )
 
         let loadedCount = try await waitForJavaScriptInt(
@@ -955,6 +956,7 @@ struct WKWebViewIntegrationTests {
         )
         let probe = WKNavigationProbe()
         let baseURL = StillmdTestPaths.exampleImageDirectory
+        let readAccessRoot = FileManager.default.homeDirectoryForCurrentUser
         let html = HTMLTemplate.build(
             markdownContent: markdown,
             markedJS: ResourceLoader.loadMarkedJS(),
@@ -962,7 +964,7 @@ struct WKWebViewIntegrationTests {
             css: ResourceLoader.loadCSS(),
             documentBaseURL: baseURL
         )
-        let tempHTML = try writeTemporaryHTMLFile(html, rootDirectory: baseURL)
+        let tempHTML = try writeTemporaryHTMLFile(html, rootDirectory: readAccessRoot)
         defer {
             try? FileManager.default.removeItem(at: tempHTML.directoryURL)
         }
@@ -970,7 +972,7 @@ struct WKWebViewIntegrationTests {
         try await probe.loadFile(
             in: webView,
             fileURL: tempHTML.htmlFileURL,
-            allowingReadAccessTo: baseURL
+            allowingReadAccessTo: readAccessRoot
         )
 
         let brokenCount = try await waitForJavaScriptInt(

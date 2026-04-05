@@ -175,6 +175,7 @@ struct MarkdownWebView: NSViewRepresentable {
         markdownContent: String,
         containsMermaidFence: Bool
     ) {
+        let readAccessRootURL = FileManager.default.homeDirectoryForCurrentUser
         let html = HTMLTemplate.build(
             markdownContent: markdownContent,
             markedJS: ResourceLoader.loadMarkedJS(),
@@ -196,7 +197,7 @@ struct MarkdownWebView: NSViewRepresentable {
 
         do {
             try htmlDocument.write(html: html)
-            webView.loadFileURL(htmlDocument.fileURL, allowingReadAccessTo: baseURL)
+            webView.loadFileURL(htmlDocument.fileURL, allowingReadAccessTo: readAccessRootURL)
         } catch {
             StillmdWebViewLogger.log("temporary HTML write failed: \(error.localizedDescription)")
             webView.loadHTMLString(html, baseURL: baseURL)
@@ -267,7 +268,9 @@ struct MarkdownWebView: NSViewRepresentable {
 
         init(_ parent: MarkdownWebView) {
             self.parent = parent
-            self.htmlDocument = TemporaryHTMLDocument(rootDirectory: parent.baseURL)
+            self.htmlDocument = TemporaryHTMLDocument(
+                rootDirectory: FileManager.default.homeDirectoryForCurrentUser
+            )
         }
 
         // MARK: - WKNavigationDelegate
