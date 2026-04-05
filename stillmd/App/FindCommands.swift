@@ -4,6 +4,33 @@ struct FindAction {
     let perform: () -> Void
 }
 
+@MainActor
+final class FindCommandBindings: ObservableObject {
+    @Published var toggleFindBarAction: FindAction?
+    @Published var toggleDocumentLineNumbersAction: FindAction?
+    @Published var findNextAction: FindAction?
+    @Published var findPreviousAction: FindAction?
+
+    func installPreviewActions(
+        toggleFindBar: @escaping () -> Void,
+        toggleDocumentLineNumbers: @escaping () -> Void,
+        findNext: @escaping () -> Void,
+        findPrevious: @escaping () -> Void
+    ) {
+        toggleFindBarAction = FindAction(perform: toggleFindBar)
+        toggleDocumentLineNumbersAction = FindAction(perform: toggleDocumentLineNumbers)
+        findNextAction = FindAction(perform: findNext)
+        findPreviousAction = FindAction(perform: findPrevious)
+    }
+
+    func clearPreviewActions() {
+        toggleFindBarAction = nil
+        toggleDocumentLineNumbersAction = nil
+        findNextAction = nil
+        findPreviousAction = nil
+    }
+}
+
 private struct ToggleFindBarActionKey: FocusedValueKey {
     typealias Value = FindAction
 }
