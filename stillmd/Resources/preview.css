@@ -191,6 +191,8 @@ pre code {
     border-radius: 13px;
     padding: 18px 20px;
     overflow-x: auto;
+    font-family: "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.82em;
     line-height: 1.62;
     margin-top: 1.05em;
     margin-bottom: 1.05em;
@@ -201,9 +203,9 @@ pre code {
     flex-direction: column;
     align-items: flex-end;
     gap: 0;
-    font-family: "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
-    font-size: 0.76em;
-    line-height: 1.62;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
     color: var(--muted-color);
     user-select: none;
     font-variant-numeric: tabular-nums;
@@ -227,6 +229,9 @@ pre code {
 
 .stillmd-code-line-content {
     display: block;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
     white-space: pre;
 }
 
