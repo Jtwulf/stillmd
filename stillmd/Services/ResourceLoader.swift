@@ -1,6 +1,7 @@
 import Foundation
 
 enum ResourceLoader {
+    private static let resourceBundleName = "stillmd_stillmd.bundle"
     private static let markedLock = NSLock()
     private static let highlightLock = NSLock()
     private static let mermaidLock = NSLock()
@@ -48,10 +49,31 @@ enum ResourceLoader {
     }
 
     private static func loadBundleResource(name: String, ext: String) -> String {
-        guard let url = Bundle.module.url(forResource: name, withExtension: ext),
+        let bundle = resourceBundle()
+        guard let url = bundle.url(forResource: name, withExtension: ext),
               let content = try? String(contentsOf: url, encoding: .utf8) else {
-            fatalError("Required resource \(name).\(ext) not found in bundle")
+            fatalError("Required resource \(name).\(ext) not found in \(resourceBundleName)")
         }
         return content
+    }
+
+    private static func resourceBundle() -> Bundle {
+        if !Bundle.main.bundleURL.path.contains(".app") {
+            return Bundle.module
+        }
+
+        let candidateURLs: [URL] = [
+            Bundle.main.bundleURL.appendingPathComponent(resourceBundleName),
+            Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent(resourceBundleName),
+            Bundle.main.resourceURL?.appendingPathComponent(resourceBundleName)
+        ].compactMap { $0 }
+
+        for url in candidateURLs where FileManager.default.fileExists(atPath: url.path) {
+            if let bundle = Bundle(url: url) {
+                return bundle
+            }
+        }
+
+        fatalError("could not locate resource bundle \(resourceBundleName)")
     }
 }
