@@ -3,19 +3,12 @@ import SwiftUI
 struct PreviewView: View {
     let fileURL: URL
     @ObservedObject var windowManager: WindowManager
-    @ObservedObject var findCommandBindings: FindCommandBindings
+    @ObservedObject var findPresentation: FindPresentationState
     @StateObject private var viewModel: PreviewViewModel
     @EnvironmentObject private var themeState: ThemeState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(AppPreferences.textScaleKey) private var textScale = AppPreferences.defaultTextScale
 
-    @State private var isFindBarPresented = false
-    @State private var findQuery = ""
-    @State private var findStatus = FindStatus.empty
-    @State private var findRequest: FindRequest?
-    @State private var findRequestID = 0
-    @State private var isFindBarChromeReserved = false
-    @State private var pendingFindResetTask: Task<Void, Never>?
     @State private var isPreviewRevealed = false
     @State private var previewRevealScheduleID = 0
     @State private var webRevealFallbackTask: Task<Void, Never>?
@@ -23,11 +16,11 @@ struct PreviewView: View {
     init(
         fileURL: URL,
         windowManager: WindowManager,
-        findCommandBindings: FindCommandBindings
+        findPresentation: FindPresentationState
     ) {
         self.fileURL = fileURL
         self.windowManager = windowManager
-        self.findCommandBindings = findCommandBindings
+        self.findPresentation = findPresentation
         _viewModel = StateObject(wrappedValue: PreviewViewModel(fileURL: fileURL))
     }
 
@@ -41,7 +34,7 @@ struct PreviewView: View {
 
     /// エラー帯または検索バー表示中のみインセット内に実コンテンツを置く（非表示時は高さ 0 でプレースホルダ）。
     private var shouldShowTopChrome: Bool {
-        isFindBarChromeReserved || (viewModel.errorMessage != nil && shouldKeepPreviewVisible)
+        findPresentation.isFindBarChromeReserved || (viewModel.errorMessage != nil && shouldKeepPreviewVisible)
     }
 
     private var previewRevealOpacity: Double {
@@ -66,23 +59,6 @@ struct PreviewView: View {
             // Register this file in WindowManager for duplicate detection,
             // regardless of how the window was created (Finder, Dock, NSWorkspace, etc.)
             windowManager.registerFile(fileURL)
-            findCommandBindings.installPreviewActions(
-                toggleFindBar: toggleFindBar,
-                findNext: {
-                    if !isFindBarPresented {
-                        presentFindBar()
-                        return
-                    }
-                    triggerFind(.next)
-                },
-                findPrevious: {
-                    if !isFindBarPresented {
-                        presentFindBar()
-                        return
-                    }
-                    triggerFind(.previous)
-                }
-            )
             viewModel.startWatching()
             // `shouldKeepPreviewVisible == true` のとき従来はここで schedule していなかったため、
             // `didCommit` が来ない環境だと `isPreviewRevealed` が永遠に false のまま真っ白になる。
@@ -94,9 +70,8 @@ struct PreviewView: View {
             }
         }
         .onDisappear {
-            pendingFindResetTask?.cancel()
             webRevealFallbackTask?.cancel()
-            findCommandBindings.clearPreviewActions()
+            findPresentation.resetForDocumentChange()
             viewModel.stopWatching()
             windowManager.closeFile(fileURL)
         }
@@ -104,8 +79,8 @@ struct PreviewView: View {
             handleDrop(providers)
         }
         .onExitCommand {
-            guard isFindBarPresented else { return }
-            dismissFindBar()
+            guard findPresentation.isFindBarPresented else { return }
+            findPresentation.dismissFindBar(reduceMotion: reduceMotion)
         }
     }
 
@@ -120,9 +95,9 @@ struct PreviewView: View {
                     scrollPosition: $viewModel.scrollPosition,
                     themePreference: themePreference,
                     textScale: AppPreferences.clampedTextScale(textScale),
-                    findQuery: findQuery,
-                    findRequest: findRequest,
-                    findStatus: $findStatus,
+                    findQuery: findPresentation.findQuery,
+                    findRequest: findPresentation.findRequest,
+                    findStatus: $findPresentation.findStatus,
                     onInitialNavigationCommitted: onMarkdownWebViewInitialNavigationCommitted,
                     onWillLoadWebContent: { schedulePreviewReveal() }
                 )
@@ -185,13 +160,13 @@ struct PreviewView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                if isFindBarPresented {
+                if findPresentation.isFindBarPresented {
                     FindBar(
-                        query: $findQuery,
-                        status: findStatus,
-                        onPrevious: { triggerFind(.previous) },
-                        onNext: { triggerFind(.next) },
-                        onClose: dismissFindBar
+                        query: $findPresentation.findQuery,
+                        status: findPresentation.findStatus,
+                        onPrevious: { findPresentation.triggerFind(.previous) },
+                        onNext: { findPresentation.triggerFind(.next) },
+                        onClose: { findPresentation.dismissFindBar(reduceMotion: reduceMotion) }
                     )
                     .transition(StillmdMotion.findBarTransition(reduceMotion: reduceMotion))
                 }
@@ -217,71 +192,5 @@ struct PreviewView: View {
             }
         }
         return true
-    }
-
-    private func toggleFindBar() {
-        if isFindBarPresented {
-            dismissFindBar()
-        } else {
-            presentFindBar()
-        }
-    }
-
-    private func presentFindBar() {
-        guard !isFindBarPresented else { return }
-        pendingFindResetTask?.cancel()
-        runAnimation(StillmdMotion.animation(for: StillmdMotion.findBarInsertion, reduceMotion: reduceMotion)) {
-            isFindBarChromeReserved = true
-            isFindBarPresented = true
-        }
-    }
-
-    private func dismissFindBar() {
-        guard isFindBarPresented else { return }
-        pendingFindResetTask?.cancel()
-        runAnimation(StillmdMotion.animation(for: StillmdMotion.findBarRemoval, reduceMotion: reduceMotion)) {
-            isFindBarPresented = false
-        }
-        scheduleFindReset()
-    }
-
-    private func triggerFind(_ direction: FindDirection) {
-        guard !findQuery.isEmpty else { return }
-        findRequestID += 1
-        findRequest = FindRequest(id: findRequestID, direction: direction)
-    }
-
-    private func scheduleFindReset() {
-        let reset = {
-            findQuery = ""
-            findStatus = .empty
-            findRequest = nil
-        }
-
-        guard !reduceMotion else {
-            reset()
-            isFindBarChromeReserved = false
-            return
-        }
-
-        pendingFindResetTask = Task { @MainActor in
-            try? await Task.sleep(
-                nanoseconds: UInt64(StillmdMotion.findBarRemoval.duration * 1_000_000_000)
-            )
-
-            guard !Task.isCancelled, !isFindBarPresented else { return }
-            reset()
-            runAnimation(StillmdMotion.animation(for: StillmdMotion.findBarRemoval, reduceMotion: reduceMotion)) {
-                isFindBarChromeReserved = false
-            }
-        }
-    }
-
-    private func runAnimation(_ animation: Animation?, updates: () -> Void) {
-        if let animation {
-            withAnimation(animation, updates)
-        } else {
-            updates()
-        }
     }
 }
