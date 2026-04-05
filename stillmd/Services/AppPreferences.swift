@@ -41,6 +41,17 @@ enum ThemePreference: String, CaseIterable, Identifiable {
             return .dark
         }
     }
+
+    func resolvedColorScheme(using colorScheme: ColorScheme) -> ColorScheme {
+        switch self {
+        case .system:
+            return colorScheme
+        case .light:
+            return .light
+        case .dark:
+            return .dark
+        }
+    }
 }
 
 enum AppPreferences {

@@ -1584,6 +1584,14 @@ struct AppPreferencesUnitTests {
         #expect(ThemePreference.dark.resolvedColorScheme(using: lightAppearance) == .dark)
     }
 
+    @Test("ThemePreference resolves system color scheme from view environment")
+    func themePreferenceResolvesSystemColorScheme() {
+        #expect(ThemePreference.system.resolvedColorScheme(using: .light) == .light)
+        #expect(ThemePreference.system.resolvedColorScheme(using: .dark) == .dark)
+        #expect(ThemePreference.light.resolvedColorScheme(using: .dark) == .light)
+        #expect(ThemePreference.dark.resolvedColorScheme(using: .light) == .dark)
+    }
+
     @Test("Text scale is clamped to supported range")
     func textScaleIsClampedToSupportedRange() {
         #expect(AppPreferences.clampedTextScale(0.1) == AppPreferences.textScaleRange.lowerBound)
