@@ -25,6 +25,8 @@ class PreviewViewModel: ObservableObject {
     }
 
     deinit {
+        modifiedDebounceTask?.cancel()
+        recoveryTask?.cancel()
         if holdsSecurityScopedAccess {
             fileURL.stopAccessingSecurityScopedResource()
         }
@@ -40,9 +42,12 @@ class PreviewViewModel: ObservableObject {
     }
 
     func stopWatching() {
+        let hadPendingModifiedDebounce = modifiedDebounceTask != nil
         modifiedDebounceTask?.cancel()
         modifiedDebounceTask = nil
-        loadFile()
+        if hadPendingModifiedDebounce {
+            loadFile()
+        }
         recoveryTask?.cancel()
         recoveryTask = nil
         fileWatcher?.stop()
@@ -64,7 +69,7 @@ class PreviewViewModel: ObservableObject {
         }
     }
 
-    /// Exposed for tests (`@testable import`); production path is `FileWatcher` → `startWatching`.
+    /// 本番では `FileWatcher` のコールバック（`startWatching`）からのみ呼ばれる。`@testable` テストから直接触る。
     func handleFileEvent(_ event: FileWatcher.Event) {
         switch event {
         case .modified:
