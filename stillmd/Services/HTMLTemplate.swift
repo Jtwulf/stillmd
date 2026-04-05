@@ -17,7 +17,6 @@ enum HTMLTemplate {
         themePreference: String = ThemePreference.system.rawValue,
         resolvedTheme: String,
         textScale: Double = AppPreferences.defaultTextScale,
-        documentLineNumbersVisible: Bool = false,
         documentBaseURL: URL? = nil,
         initialFindQuery: String = "",
         mermaidJS: String? = nil
@@ -60,9 +59,6 @@ enum HTMLTemplate {
             \(mermaidScriptTag)
         </head>
         <body>
-            <div id="document-line-number-overlay" aria-hidden="true">
-                <div id="document-line-number-column" data-document-line-numbers-state="hidden"></div>
-            </div>
             <div id="content"></div>
             <script>
                 try {
@@ -104,8 +100,6 @@ enum HTMLTemplate {
                 window.__stillmdBootPhase = 'before-initial-render';
                 const md = stillmdMarkdownFromBase64('\(markdownBase64)');
                 const contentElement = document.getElementById('content');
-                const documentLineNumberOverlay = document.getElementById('document-line-number-overlay');
-                const documentLineNumberColumn = document.getElementById('document-line-number-column');
                 const messageHandlers = window.webkit?.messageHandlers ?? {};
                 const scrollHandler = messageHandlers.scrollPosition ?? null;
                 const findResultsHandler = messageHandlers.findResults ?? null;
@@ -114,45 +108,17 @@ enum HTMLTemplate {
                 const initialThemePreference = "\(escapedThemePreference)";
                 const initialResolvedTheme = "\(escapedResolvedThemeValue)";
                 const initialTextScale = \(textScale);
-                const initialDocumentLineNumbersVisible = \(documentLineNumbersVisible ? "true" : "false");
                 const initialFindQuery = "\(escapedInitialFindQuery)";
                 const viewerState = {
                     themePreference: initialThemePreference,
                     resolvedTheme: initialResolvedTheme,
                     findQuery: initialFindQuery,
-                    documentLineNumbersVisible: initialDocumentLineNumbersVisible,
-                };
-                const documentLineNumberMotion = {
-                    enterDurationMs: 130,
-                    exitDurationMs: 100,
-                    enterOffsetPx: -4,
-                    exitOffsetPx: -2,
                 };
                 let findMatches = [];
                 let findState = { currentIndex: -1 };
-                let documentLineNumberLayoutPending = false;
                 let mermaidRenderGeneration = 0;
                 let mermaidRenderSequence = 0;
-                let documentLineNumberRevealFrameID = 0;
-                let documentLineNumberHideTimerID = 0;
                 window.__stillmdBootPhase = 'state-ready';
-
-                document.documentElement.style.setProperty(
-                    '--document-line-number-enter-duration',
-                    `${documentLineNumberMotion.enterDurationMs}ms`
-                );
-                document.documentElement.style.setProperty(
-                    '--document-line-number-exit-duration',
-                    `${documentLineNumberMotion.exitDurationMs}ms`
-                );
-                document.documentElement.style.setProperty(
-                    '--document-line-number-enter-offset-x',
-                    `${documentLineNumberMotion.enterOffsetPx}px`
-                );
-                document.documentElement.style.setProperty(
-                    '--document-line-number-exit-offset-x',
-                    `${documentLineNumberMotion.exitOffsetPx}px`
-                );
 
                 function postMessageIfAvailable(handler, payload) {
                     if (handler && typeof handler.postMessage === 'function') {
@@ -364,203 +330,6 @@ enum HTMLTemplate {
                     await Promise.all(
                         mermaidBlocks.map((pre) => renderMermaidBlock(pre, generation))
                     );
-
-                    if (generation === mermaidRenderGeneration) {
-                        scheduleDocumentLineNumberLayout();
-                    }
-                }
-
-                function prefersReducedMotion() {
-                    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-                }
-
-                function setDocumentLineNumberState(nextState) {
-                    documentLineNumberColumn.dataset.documentLineNumbersState = nextState;
-                }
-
-                function cancelDocumentLineNumberRevealFrame() {
-                    if (documentLineNumberRevealFrameID) {
-                        cancelAnimationFrame(documentLineNumberRevealFrameID);
-                        documentLineNumberRevealFrameID = 0;
-                    }
-                }
-
-                function clearDocumentLineNumberHideTimer() {
-                    if (documentLineNumberHideTimerID) {
-                        clearTimeout(documentLineNumberHideTimerID);
-                        documentLineNumberHideTimerID = 0;
-                    }
-                }
-
-                function clearDocumentLineNumbers() {
-                    clearDocumentLineNumberHideTimer();
-                    cancelDocumentLineNumberRevealFrame();
-                    documentLineNumberColumn.replaceChildren();
-                    documentLineNumberColumn.style.left = '';
-                    documentLineNumberColumn.style.top = '';
-                    document.documentElement.style.setProperty('--document-line-number-gutter-width', '0px');
-                    setDocumentLineNumberState('hidden');
-                }
-
-                function scheduleDocumentLineNumberLayout() {
-                    if (
-                        !viewerState.documentLineNumbersVisible &&
-                        documentLineNumberColumn.dataset.documentLineNumbersState !== 'exiting'
-                    ) {
-                        clearDocumentLineNumbers();
-                        return;
-                    }
-
-                    if (documentLineNumberLayoutPending) {
-                        return;
-                    }
-
-                    documentLineNumberLayoutPending = true;
-                    requestAnimationFrame(() => {
-                        documentLineNumberLayoutPending = false;
-                        layoutDocumentLineNumbers();
-                    });
-                }
-
-                // Marker vs text / inline spans: tops can differ by ~10px on one typographic line.
-                const DOC_LINE_MERGE_EPSILON_INNER_PX = 10;
-                const DOC_LINE_MERGE_EPSILON_GLOBAL_PX = 14;
-
-                // getClientRects() can return multiple boxes per typographic line (e.g. inline <code>),
-                // which would stack multiple line numbers at the same Y — merge by baseline proximity.
-                function mergeVisualLineRects(rawRects) {
-                    if (!rawRects.length) {
-                        return [];
-                    }
-                    const sorted = rawRects.slice().sort((a, b) => a.top - b.top || a.left - b.left);
-                    const merged = [];
-                    const epsilon = DOC_LINE_MERGE_EPSILON_INNER_PX;
-                    for (const rect of sorted) {
-                        const h = Math.max(rect.height, 1);
-                        const last = merged[merged.length - 1];
-                        if (last && Math.abs(rect.top - last.top) < epsilon) {
-                            const bottom = Math.max(last.top + last.height, rect.top + h);
-                            last.height = Math.max(1, bottom - last.top);
-                        } else {
-                            merged.push({ top: rect.top, height: h });
-                        }
-                    }
-                    return merged;
-                }
-
-                // Same-baseline rows can come from *different* DOM nodes (e.g. nested list markers vs text).
-                function globalMergeVisualLineRows(rows) {
-                    if (!rows.length) {
-                        return [];
-                    }
-                    const sorted = rows.slice().sort((a, b) => a.top - b.top);
-                    const merged = [];
-                    const epsilon = DOC_LINE_MERGE_EPSILON_GLOBAL_PX;
-                    for (const row of sorted) {
-                        const last = merged[merged.length - 1];
-                        if (last && Math.abs(row.top - last.top) < epsilon) {
-                            const bottom = Math.max(last.top + last.height, row.top + row.height);
-                            last.height = Math.max(1, bottom - last.top);
-                        } else {
-                            merged.push({ top: row.top, height: row.height });
-                        }
-                    }
-                    return merged;
-                }
-
-                function layoutDocumentLineNumbers() {
-                    if (!viewerState.documentLineNumbersVisible) {
-                        clearDocumentLineNumbers();
-                        return;
-                    }
-
-                    const candidates = contentElement.querySelectorAll(
-                        'h1, h2, h3, h4, h5, h6, p, li, tr, hr, .stillmd-code-line'
-                    );
-
-                    function rectsForDocumentLineCandidate(candidate) {
-                        if (candidate.tagName === 'LI' && candidate.querySelector('p, .stillmd-code-line')) {
-                            return [];
-                        }
-                        if (candidate.classList && candidate.classList.contains('stillmd-code-line')) {
-                            const box = candidate.getBoundingClientRect();
-                            return box.width > 0 || box.height > 0 ? [box] : [];
-                        }
-                        const range = document.createRange();
-                        range.selectNodeContents(candidate);
-                        let rects = Array.from(range.getClientRects()).filter((rect) => {
-                            return rect.width > 0 && rect.height > 0;
-                        });
-                        rects = mergeVisualLineRects(rects);
-                        if (!rects.length) {
-                            const fallbackRect = candidate.getBoundingClientRect();
-                            if (fallbackRect.width > 0 || fallbackRect.height > 0) {
-                                rects = mergeVisualLineRects([fallbackRect]);
-                            }
-                        }
-                        return rects;
-                    }
-
-                    let totalLines = 0;
-                    for (const candidate of candidates) {
-                        totalLines += rectsForDocumentLineCandidate(candidate).length;
-                    }
-
-                    const digits = String(Math.max(1, totalLines)).length;
-                    document.documentElement.style.setProperty(
-                        '--document-line-number-gutter-width',
-                        `${Math.max(2, digits + 1)}ch`
-                    );
-                    void contentElement.offsetWidth;
-
-                    const rowRects = [];
-                    for (const candidate of candidates) {
-                        for (const rect of rectsForDocumentLineCandidate(candidate)) {
-                            rowRects.push({
-                                top: rect.top,
-                                height: Math.max(rect.height, 1),
-                            });
-                        }
-                    }
-                    const mergedRowRects = globalMergeVisualLineRows(rowRects);
-
-                    const overlayRect = documentLineNumberOverlay.getBoundingClientRect();
-                    const contentRect = contentElement.getBoundingClientRect();
-                    void documentLineNumberColumn.offsetWidth;
-                    const gutterWidthPx = documentLineNumberColumn.getBoundingClientRect().width;
-                    documentLineNumberColumn.style.left = `${contentRect.left - gutterWidthPx - overlayRect.left}px`;
-                    documentLineNumberColumn.style.top = `${contentRect.top - overlayRect.top}px`;
-
-                    const columnRect = documentLineNumberColumn.getBoundingClientRect();
-                    const fragment = document.createDocumentFragment();
-                    for (let i = 0; i < mergedRowRects.length; i++) {
-                        const row = document.createElement('div');
-                        row.className = 'document-line-number';
-                        row.textContent = String(i + 1);
-                        const r = mergedRowRects[i];
-                        row.style.top = `${r.top - columnRect.top}px`;
-                        row.style.height = `${r.height}px`;
-                        fragment.appendChild(row);
-                    }
-                    documentLineNumberColumn.replaceChildren(fragment);
-
-                    if (!viewerState.documentLineNumbersVisible) {
-                        return;
-                    }
-
-                    cancelDocumentLineNumberRevealFrame();
-                    if (prefersReducedMotion()) {
-                        setDocumentLineNumberState('visible');
-                        return;
-                    }
-
-                    documentLineNumberRevealFrameID = requestAnimationFrame(() => {
-                        documentLineNumberRevealFrameID = 0;
-                        if (!viewerState.documentLineNumbersVisible) {
-                            return;
-                        }
-                        setDocumentLineNumberState('visible');
-                    });
                 }
 
                 async function renderMarkdown(source) {
@@ -573,7 +342,6 @@ enum HTMLTemplate {
                         publishFindResults();
                     }
                     await renderMermaidBlocks();
-                    scheduleDocumentLineNumberLayout();
                 }
 
                 function publishFindResults() {
@@ -699,7 +467,6 @@ enum HTMLTemplate {
                         : 0;
 
                     updateActiveFindMatch(true);
-                    scheduleDocumentLineNumberLayout();
                 }
 
                 function updateFindQuery(query) {
@@ -720,7 +487,6 @@ enum HTMLTemplate {
                     }
 
                     updateActiveFindMatch(true);
-                    scheduleDocumentLineNumberLayout();
                 }
 
                 function applyTheme() {
@@ -736,44 +502,11 @@ enum HTMLTemplate {
                     viewerState.resolvedTheme = nextResolvedTheme || 'light';
                     applyTheme();
                     void renderMermaidBlocks();
-                    scheduleDocumentLineNumberLayout();
                 }
 
                 function setTextScale(nextTextScale) {
                     const clampedScale = Math.min(Math.max(nextTextScale, 0.85), 1.30);
                     document.documentElement.style.setProperty('--text-scale', clampedScale);
-                    scheduleDocumentLineNumberLayout();
-                }
-
-                function setDocumentLineNumbersVisible(nextVisible) {
-                    viewerState.documentLineNumbersVisible = !!nextVisible;
-                    clearDocumentLineNumberHideTimer();
-                    cancelDocumentLineNumberRevealFrame();
-
-                    if (!viewerState.documentLineNumbersVisible) {
-                        if (prefersReducedMotion()) {
-                            clearDocumentLineNumbers();
-                            return;
-                        }
-                        if (!documentLineNumberColumn.children.length) {
-                            clearDocumentLineNumbers();
-                            return;
-                        }
-                        setDocumentLineNumberState('exiting');
-                        documentLineNumberHideTimerID = window.setTimeout(() => {
-                            documentLineNumberHideTimerID = 0;
-                            if (!viewerState.documentLineNumbersVisible) {
-                                clearDocumentLineNumbers();
-                            }
-                        }, documentLineNumberMotion.exitDurationMs);
-                        return;
-                    }
-
-                    setDocumentLineNumberState('entering');
-                    scheduleDocumentLineNumberLayout();
-                    if (prefersReducedMotion()) {
-                        setDocumentLineNumberState('visible');
-                    }
                 }
 
                 // Intercept external link clicks
@@ -795,7 +528,6 @@ enum HTMLTemplate {
                 window.__stillmdBootPhase = 'theme-ready';
                 setThemePreference(initialThemePreference, initialResolvedTheme);
                 setTextScale(initialTextScale);
-                setDocumentLineNumbersVisible(initialDocumentLineNumbersVisible);
 
                 let scrollState = { pending: false };
                 function reportScroll() {
@@ -820,7 +552,6 @@ enum HTMLTemplate {
                 }
                 window.addEventListener('scroll', function() {
                     scheduleScrollReport();
-                    scheduleDocumentLineNumberLayout();
                 }, { passive: true });
 
                 // Global updateContent function for live reload
@@ -835,12 +566,6 @@ enum HTMLTemplate {
                         });
                 }
 
-                const resizeObserver = new ResizeObserver(() => {
-                    scheduleDocumentLineNumberLayout();
-                });
-                resizeObserver.observe(contentElement);
-                resizeObserver.observe(document.body);
-                window.addEventListener('resize', scheduleDocumentLineNumberLayout);
                 window.__stillmdBootPhase = 'before-render';
 
                 renderMarkdown(md)

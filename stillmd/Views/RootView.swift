@@ -36,10 +36,6 @@ struct RootView: View {
         .preferredColorScheme(themeState.themePreference.colorScheme)
         // Keep command actions at the window root so the active document window owns shortcut state.
         .focusedSceneValue(\.toggleFindBarAction, findCommandBindings.toggleFindBarAction)
-        .focusedSceneValue(
-            \.toggleDocumentLineNumbersAction,
-            findCommandBindings.toggleDocumentLineNumbersAction
-        )
         .focusedSceneValue(\.findNextAction, findCommandBindings.findNextAction)
         .focusedSceneValue(\.findPreviousAction, findCommandBindings.findPreviousAction)
         .onAppear {

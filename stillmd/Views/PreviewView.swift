@@ -15,7 +15,6 @@ struct PreviewView: View {
     @State private var findRequest: FindRequest?
     @State private var findRequestID = 0
     @State private var isFindBarChromeReserved = false
-    @State private var isDocumentLineNumbersPresented = false
     @State private var pendingFindResetTask: Task<Void, Never>?
     @State private var isPreviewRevealed = false
     @State private var previewRevealScheduleID = 0
@@ -67,7 +66,6 @@ struct PreviewView: View {
             windowManager.registerFile(fileURL)
             findCommandBindings.installPreviewActions(
                 toggleFindBar: toggleFindBar,
-                toggleDocumentLineNumbers: toggleDocumentLineNumbers,
                 findNext: {
                     if !isFindBarPresented {
                         presentFindBar()
@@ -120,7 +118,6 @@ struct PreviewView: View {
                     themePreference: themePreference,
                     resolvedColorScheme: themeState.resolvedColorScheme,
                     textScale: AppPreferences.clampedTextScale(textScale),
-                    documentLineNumbersVisible: isDocumentLineNumbersPresented,
                     findQuery: findQuery,
                     findRequest: findRequest,
                     findStatus: $findStatus,
@@ -244,10 +241,6 @@ struct PreviewView: View {
             isFindBarPresented = false
         }
         scheduleFindReset()
-    }
-
-    private func toggleDocumentLineNumbers() {
-        isDocumentLineNumbersPresented.toggle()
     }
 
     private func triggerFind(_ direction: FindDirection) {
