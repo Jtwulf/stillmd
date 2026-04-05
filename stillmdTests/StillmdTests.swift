@@ -1627,6 +1627,22 @@ struct PreviewViewModelUnitTests {
         #expect(vm.markdownContent == "c")
     }
 
+    @Test(".deleted cancels a pending .modified debounce so loadFile does not overwrite the delete error")
+    @MainActor
+    func deletedCancelsPendingModifiedDebounce() async throws {
+        let fileURL = try createTempFile(content: "x")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let vm = PreviewViewModel(fileURL: fileURL)
+        vm.handleFileEvent(.modified)
+        try FileManager.default.removeItem(at: fileURL)
+        vm.handleFileEvent(.deleted)
+
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(vm.errorMessage?.contains("見つかりません") == true)
+        #expect(vm.errorMessage?.contains("読み込めません") != true)
+    }
+
     @Test("stopWatching flushes pending debounced load")
     @MainActor
     func stopWatchingFlushesDebouncedLoad() async throws {

@@ -77,6 +77,8 @@ class PreviewViewModel: ObservableObject {
         case .modified:
             scheduleDebouncedLoadFromDisk()
         case .deleted:
+            modifiedDebounceTask?.cancel()
+            modifiedDebounceTask = nil
             errorMessage = "ファイルが見つかりません: \(fileURL.lastPathComponent)"
             startRecoveryPolling()
         }
