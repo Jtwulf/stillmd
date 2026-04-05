@@ -242,24 +242,20 @@ struct FindCommandBindingsUnitTests {
     func installPreviewActionsStoresClosures() {
         let bindings = FindCommandBindings()
         var toggleFindBarCount = 0
-        var toggleLineNumbersCount = 0
         var findNextCount = 0
         var findPreviousCount = 0
 
         bindings.installPreviewActions(
             toggleFindBar: { toggleFindBarCount += 1 },
-            toggleDocumentLineNumbers: { toggleLineNumbersCount += 1 },
             findNext: { findNextCount += 1 },
             findPrevious: { findPreviousCount += 1 }
         )
 
         bindings.toggleFindBarAction?.perform()
-        bindings.toggleDocumentLineNumbersAction?.perform()
         bindings.findNextAction?.perform()
         bindings.findPreviousAction?.perform()
 
         #expect(toggleFindBarCount == 1)
-        #expect(toggleLineNumbersCount == 1)
         #expect(findNextCount == 1)
         #expect(findPreviousCount == 1)
     }
@@ -269,7 +265,6 @@ struct FindCommandBindingsUnitTests {
         let bindings = FindCommandBindings()
         bindings.installPreviewActions(
             toggleFindBar: {},
-            toggleDocumentLineNumbers: {},
             findNext: {},
             findPrevious: {}
         )
@@ -277,7 +272,6 @@ struct FindCommandBindingsUnitTests {
         bindings.clearPreviewActions()
 
         #expect(bindings.toggleFindBarAction == nil)
-        #expect(bindings.toggleDocumentLineNumbersAction == nil)
         #expect(bindings.findNextAction == nil)
         #expect(bindings.findPreviousAction == nil)
     }
@@ -602,36 +596,6 @@ struct HTMLTemplateUnitTests {
     func containsContentDiv() {
         let html = buildHTML(from: "test")
         #expect(html.contains("<div id=\"content\"></div>"))
-    }
-
-    @Test("Contains document line number overlay and toggle hook")
-    func containsDocumentLineNumberOverlay() {
-        let html = buildHTML(from: "test")
-        #expect(html.contains("document-line-number-overlay"))
-        #expect(html.contains("document-line-number-column"))
-        #expect(html.contains("data-document-line-numbers-state=\"hidden\""))
-        #expect(html.contains("const documentLineNumberMotion = {"))
-        #expect(html.contains("function prefersReducedMotion()"))
-        #expect(html.contains("function setDocumentLineNumberState"))
-        #expect(html.contains("function setDocumentLineNumbersVisible"))
-        #expect(html.contains("scheduleDocumentLineNumberLayout"))
-        #expect(html.contains("documentLineNumberHideTimerID"))
-        #expect(html.contains("documentLineNumberRevealFrameID"))
-    }
-
-    @Test("Document line number layout aligns rows to column and uses one box per code line")
-    func documentLineNumberLayoutUsesColumnGeometry() {
-        let html = buildHTML(from: "test")
-        #expect(html.contains("documentLineNumberOverlay.getBoundingClientRect"))
-        #expect(html.contains("classList.contains('stillmd-code-line')"))
-        #expect(html.contains("rectsForDocumentLineCandidate"))
-        #expect(html.contains("mergeVisualLineRects"))
-        #expect(html.contains("globalMergeVisualLineRows"))
-        #expect(html.contains("DOC_LINE_MERGE_EPSILON_GLOBAL_PX"))
-        #expect(html.contains("rowRects"))
-        #expect(html.contains("setDocumentLineNumberState('visible')"))
-        #expect(html.contains("documentLineNumberRevealFrameID = requestAnimationFrame"))
-        #expect(html.contains("prefersReducedMotion()"))
     }
 
     @Test("Contains default code block line number decorator")
@@ -2027,24 +1991,6 @@ struct CSSAndInfoPlistUnitTests {
         let css = try #require(try? String(contentsOf: cssURL!, encoding: .utf8))
         #expect(css.contains("[data-theme=\"dark\"]"),
                 "preview.css should contain [data-theme=\"dark\"] selector")
-    }
-
-    @Test("preview.css contains document line number motion selectors")
-    func cssContainsDocumentLineNumberMotionSelectors() throws {
-        let cssURL = Bundle.module.url(forResource: "preview", withExtension: "css")
-        let css = try #require(try? String(contentsOf: cssURL!, encoding: .utf8))
-        #expect(css.contains("--document-line-number-enter-duration"),
-                "preview.css should define the enter duration variable")
-        #expect(css.contains("--document-line-number-exit-duration"),
-                "preview.css should define the exit duration variable")
-        #expect(css.contains("[data-document-line-numbers-state=\"entering\"]"),
-                "preview.css should define the entering state selector")
-        #expect(css.contains("[data-document-line-numbers-state=\"visible\"]"),
-                "preview.css should define the visible state selector")
-        #expect(css.contains("[data-document-line-numbers-state=\"exiting\"]"),
-                "preview.css should define the exiting state selector")
-        #expect(css.contains("@media (prefers-reduced-motion: reduce)"),
-                "preview.css should disable motion for Reduce Motion")
     }
 
     @Test("preview.css font-family includes -apple-system")

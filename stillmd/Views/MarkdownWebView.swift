@@ -72,7 +72,6 @@ struct MarkdownWebView: NSViewRepresentable {
     let themePreference: ThemePreference
     let resolvedColorScheme: ColorScheme
     let textScale: Double
-    let documentLineNumbersVisible: Bool
     let findQuery: String
     let findRequest: FindRequest?
     @Binding var findStatus: FindStatus
@@ -105,7 +104,6 @@ struct MarkdownWebView: NSViewRepresentable {
             themePreference: themePreference.rawValue,
             resolvedTheme: resolvedColorScheme.stillmdThemeName,
             textScale: textScale,
-            documentLineNumbersVisible: documentLineNumbersVisible,
             documentBaseURL: baseURL,
             initialFindQuery: findQuery,
             mermaidJS: containsMermaidFence ? ResourceLoader.loadMermaidJS() : nil
@@ -116,7 +114,6 @@ struct MarkdownWebView: NSViewRepresentable {
         context.coordinator.lastThemePreference = themePreference.rawValue
         context.coordinator.lastResolvedTheme = resolvedColorScheme.stillmdThemeName
         context.coordinator.lastTextScale = textScale
-        context.coordinator.lastDocumentLineNumbersVisible = documentLineNumbersVisible
         context.coordinator.lastFindQuery = findQuery
         context.coordinator.lastContainsMermaidFence = containsMermaidFence
 
@@ -151,7 +148,6 @@ struct MarkdownWebView: NSViewRepresentable {
             context.coordinator.lastContent = markdownContent
             context.coordinator.lastThemePreference = themePreference.rawValue
             context.coordinator.lastTextScale = textScale
-            context.coordinator.lastDocumentLineNumbersVisible = documentLineNumbersVisible
             context.coordinator.lastFindQuery = findQuery
             context.coordinator.lastContainsMermaidFence = containsMermaidFence
 
@@ -159,14 +155,13 @@ struct MarkdownWebView: NSViewRepresentable {
                 markdownContent: markdownContent,
                 markedJS: ResourceLoader.loadMarkedJS(),
                 highlightJS: ResourceLoader.loadHighlightJS(),
-            css: ResourceLoader.loadCSS(),
-            initialScrollPosition: Double(scrollPosition),
-            themePreference: themePreference.rawValue,
-            resolvedTheme: resolvedColorScheme.stillmdThemeName,
-            textScale: textScale,
-            documentLineNumbersVisible: documentLineNumbersVisible,
-            documentBaseURL: baseURL,
-            initialFindQuery: findQuery,
+                css: ResourceLoader.loadCSS(),
+                initialScrollPosition: Double(scrollPosition),
+                themePreference: themePreference.rawValue,
+                resolvedTheme: resolvedColorScheme.stillmdThemeName,
+                textScale: textScale,
+                documentBaseURL: baseURL,
+                initialFindQuery: findQuery,
                 mermaidJS: containsMermaidFence ? ResourceLoader.loadMermaidJS() : nil
             )
             webView.loadHTMLString(html, baseURL: baseURL)
@@ -205,14 +200,6 @@ struct MarkdownWebView: NSViewRepresentable {
         if context.coordinator.lastTextScale != clampedTextScale {
             context.coordinator.lastTextScale = clampedTextScale
             evaluateJavaScript("setTextScale(\(clampedTextScale));", in: webView)
-        }
-
-        if context.coordinator.lastDocumentLineNumbersVisible != documentLineNumbersVisible {
-            context.coordinator.lastDocumentLineNumbersVisible = documentLineNumbersVisible
-            evaluateJavaScript(
-                "setDocumentLineNumbersVisible(\(documentLineNumbersVisible));",
-                in: webView
-            )
         }
 
         if context.coordinator.lastFindQuery != findQuery {
@@ -258,7 +245,6 @@ struct MarkdownWebView: NSViewRepresentable {
         var lastThemePreference: String = ThemePreference.system.rawValue
         var lastResolvedTheme: String = ColorScheme.light.stillmdThemeName
         var lastTextScale: Double = AppPreferences.defaultTextScale
-        var lastDocumentLineNumbersVisible: Bool = false
         var lastFindQuery: String = ""
         var lastFindRequestID: Int?
         var lastContainsMermaidFence: Bool = false
