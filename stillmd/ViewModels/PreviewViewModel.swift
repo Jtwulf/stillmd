@@ -55,12 +55,8 @@ class PreviewViewModel: ObservableObject {
     }
 
     func stopWatching() {
-        let hadPendingModifiedDebounce = modifiedDebounceTask != nil
         modifiedDebounceTask?.cancel()
         modifiedDebounceTask = nil
-        if hadPendingModifiedDebounce {
-            loadFile()
-        }
         recoveryTask?.cancel()
         recoveryTask = nil
         fileWatcher?.stop()
@@ -103,11 +99,15 @@ class PreviewViewModel: ObservableObject {
         let generation = modifiedDebounceGeneration
         let delay = modifiedDebounce
         modifiedDebounceTask = Task { @MainActor [weak self] in
+            defer {
+                if let self, generation == self.modifiedDebounceGeneration {
+                    self.modifiedDebounceTask = nil
+                }
+            }
             try? await Task.sleep(for: delay)
             guard let self, !Task.isCancelled else { return }
             guard generation == self.modifiedDebounceGeneration else { return }
             self.loadFile()
-            self.modifiedDebounceTask = nil
         }
     }
 
