@@ -6,8 +6,8 @@ struct RootView: View {
     @ObservedObject var pendingFileOpenCoordinator: PendingFileOpenCoordinator
     @EnvironmentObject private var themeState: ThemeState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @ObservedObject var findCommandBindings: FindCommandBindings
     @Environment(\.documentChromeController) private var documentChromeController
+    @StateObject private var findPresentation = FindPresentationState()
 
     /// `EmptyStateView` は初回表示だけ `windowEntrance` を通す。
     /// 背景は先に描画されるので、`false -> true` の遷移でも白抜けしない。
@@ -34,10 +34,26 @@ struct RootView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .preferredColorScheme(themePreference.colorScheme)
-        // Keep command actions at the window root so the active document window owns shortcut state.
-        .focusedSceneValue(\.toggleFindBarAction, findCommandBindings.toggleFindBarAction)
-        .focusedSceneValue(\.findNextAction, findCommandBindings.findNextAction)
-        .focusedSceneValue(\.findPreviousAction, findCommandBindings.findPreviousAction)
+        // Keep command actions at the window root so shortcut state follows the document window,
+        // not the transient PreviewView lifecycle.
+        .focusedSceneValue(
+            \.toggleFindBarAction,
+            documentSession.fileURL == nil
+                ? nil
+                : FindAction(perform: { findPresentation.toggleFindBar(reduceMotion: reduceMotion) })
+        )
+        .focusedSceneValue(
+            \.findNextAction,
+            documentSession.fileURL == nil
+                ? nil
+                : FindAction(perform: { findPresentation.performFind(.next) })
+        )
+        .focusedSceneValue(
+            \.findPreviousAction,
+            documentSession.fileURL == nil
+                ? nil
+                : FindAction(perform: { findPresentation.performFind(.previous) })
+        )
         .onAppear {
             if documentSession.fileURL != nil {
                 emptyStateRevealTask?.cancel()
@@ -50,6 +66,9 @@ struct RootView: View {
             } else {
                 scheduleEmptyStateReveal()
             }
+            if documentSession.fileURL == nil {
+                findPresentation.resetForDocumentChange()
+            }
             syncDocumentChrome()
         }
         .onChange(of: pendingFileOpenCoordinator.pendingChangeID) { _, _ in
@@ -58,9 +77,13 @@ struct RootView: View {
                 emptyStateRevealTask = nil
                 isEmptyStatePresented = false
             }
+            if documentSession.fileURL == nil {
+                findPresentation.resetForDocumentChange()
+            }
             syncDocumentChrome()
         }
         .onChange(of: documentSession.fileURL?.path ?? "") { _, _ in
+            findPresentation.resetForDocumentChange()
             syncDocumentChrome()
         }
         .onChange(of: themeState.themePreference) { _, _ in
@@ -69,6 +92,7 @@ struct RootView: View {
         .onDisappear {
             emptyStateRevealTask?.cancel()
             emptyStateRevealTask = nil
+            findPresentation.resetForDocumentChange()
         }
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
             handleDrop(providers)
@@ -83,7 +107,7 @@ struct RootView: View {
             PreviewView(
                 fileURL: url,
                 windowManager: windowManager,
-                findCommandBindings: findCommandBindings
+                findPresentation: findPresentation
             )
                 // New `PreviewView` + `StateObject` per file so URL changes reload the document and replay preview reveal.
                 .id(url.standardizedFileURL.path)

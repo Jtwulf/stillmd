@@ -335,6 +335,88 @@ struct FindCommandBindingsUnitTests {
     }
 }
 
+@Suite("FindPresentationState Unit Tests")
+@MainActor
+struct FindPresentationStateUnitTests {
+
+    @Test("present, toggle, and dismiss update the transient find bar state")
+    func presentToggleAndDismissUpdateState() {
+        let state = FindPresentationState()
+
+        state.presentFindBar()
+        #expect(state.isFindBarPresented)
+        #expect(state.isFindBarChromeReserved)
+
+        state.findQuery = "swift"
+        state.findStatus = FindStatus(matchCount: 4, currentIndex: 1)
+        state.dismissFindBar(reduceMotion: true)
+
+        #expect(!state.isFindBarPresented)
+        #expect(!state.isFindBarChromeReserved)
+        #expect(state.findQuery.isEmpty)
+        #expect(state.findStatus == .empty)
+        #expect(state.findRequest == nil)
+
+        state.toggleFindBar(reduceMotion: true)
+        #expect(state.isFindBarPresented)
+        #expect(state.isFindBarChromeReserved)
+    }
+
+    @Test("triggerFind advances request ids only when the query is non-empty")
+    func triggerFindAdvancesOnlyForNonEmptyQuery() {
+        let state = FindPresentationState()
+
+        state.triggerFind(.next)
+        #expect(state.findRequest == nil)
+
+        state.findQuery = "needle"
+        state.triggerFind(.next)
+        #expect(state.findRequest?.id == 1)
+        #expect(state.findRequest?.direction == .next)
+
+        state.triggerFind(.previous)
+        #expect(state.findRequest?.id == 2)
+        #expect(state.findRequest?.direction == .previous)
+    }
+
+    @Test("performFind opens the bar before advancing when the bar is closed")
+    func performFindOpensBarBeforeAdvancing() {
+        let state = FindPresentationState()
+
+        state.performFind(.next)
+        #expect(state.isFindBarPresented)
+        #expect(state.isFindBarChromeReserved)
+        #expect(state.findRequest == nil)
+
+        state.findQuery = "needle"
+        state.performFind(.next)
+        #expect(state.findRequest?.id == 1)
+        #expect(state.findRequest?.direction == .next)
+    }
+
+    @Test("resetForDocumentChange clears the active find state")
+    func resetForDocumentChangeClearsState() {
+        let state = FindPresentationState()
+
+        state.presentFindBar()
+        state.findQuery = "needle"
+        state.findStatus = FindStatus(matchCount: 3, currentIndex: 2)
+        state.triggerFind(.next)
+
+        state.resetForDocumentChange()
+
+        #expect(!state.isFindBarPresented)
+        #expect(!state.isFindBarChromeReserved)
+        #expect(state.findQuery.isEmpty)
+        #expect(state.findStatus == .empty)
+        #expect(state.findRequest == nil)
+
+        state.findQuery = "needle"
+        state.triggerFind(.next)
+        #expect(state.findRequest?.id == 1)
+    }
+}
+
 @Suite("LaunchOpenRequestCoordinator Unit Tests")
 @MainActor
 struct LaunchOpenRequestCoordinatorUnitTests {

@@ -5,7 +5,6 @@ import SwiftUI
 @MainActor
 final class StillmdDocumentWindow: NSWindow, NSWindowDelegate {
     let session: DocumentWindowSession
-    let findCommandBindings: FindCommandBindings
     let chromeController: DocumentWindowChromeController
 
     init(
@@ -17,7 +16,6 @@ final class StillmdDocumentWindow: NSWindow, NSWindowDelegate {
     ) {
         let session = DocumentWindowSession(fileURL: initialFileURL)
         self.session = session
-        self.findCommandBindings = FindCommandBindings()
         self.chromeController = DocumentWindowChromeController()
 
         let rect = NSRect(
@@ -53,8 +51,7 @@ final class StillmdDocumentWindow: NSWindow, NSWindowDelegate {
         let rootView = RootView(
             documentSession: session,
             windowManager: windowManager,
-            pendingFileOpenCoordinator: pendingCoordinator,
-            findCommandBindings: findCommandBindings
+            pendingFileOpenCoordinator: pendingCoordinator
         )
         .environmentObject(themeState)
         .environment(\.documentChromeController, chromeController)
