@@ -1,4 +1,3 @@
-import AppKit
 import Foundation
 import SwiftUI
 
@@ -17,8 +16,6 @@ final class ThemeState: ObservableObject {
     }
 
     @Published private(set) var themePreference: ThemePreference = .system
-    @Published private(set) var resolvedColorScheme: ColorScheme = .light
-
     private let userDefaults: UserDefaults
     private let notificationCenter: NotificationCenter
     private let distributedNotificationCenter: DistributedNotificationCenter
@@ -44,15 +41,9 @@ final class ThemeState: ObservableObject {
     private func applyCurrentTheme() {
         let rawValue = userDefaults.string(forKey: AppPreferences.themeKey)
         let nextPreference = ThemePreference(rawValue: rawValue ?? "") ?? .system
-        let appearance = NSApp.effectiveAppearance
-        let nextResolvedScheme = nextPreference.resolvedColorScheme(using: appearance)
 
         if themePreference != nextPreference {
             themePreference = nextPreference
-        }
-
-        if resolvedColorScheme != nextResolvedScheme {
-            resolvedColorScheme = nextResolvedScheme
         }
     }
 

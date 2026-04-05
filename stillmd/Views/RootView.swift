@@ -5,6 +5,7 @@ struct RootView: View {
     @ObservedObject var windowManager: WindowManager
     @ObservedObject var pendingFileOpenCoordinator: PendingFileOpenCoordinator
     @EnvironmentObject private var themeState: ThemeState
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject var findCommandBindings: FindCommandBindings
     @Environment(\.documentChromeController) private var documentChromeController
 
@@ -14,7 +15,7 @@ struct RootView: View {
     @State private var isDropTargeted = false
 
     private var resolvedColorScheme: ColorScheme {
-        themeState.resolvedColorScheme
+        themeState.themePreference.resolvedColorScheme(using: colorScheme)
     }
 
     private var windowTitle: String {
@@ -61,7 +62,7 @@ struct RootView: View {
         .onChange(of: documentSession.fileURL?.path ?? "") { _, _ in
             syncDocumentChrome()
         }
-        .onChange(of: themeState.resolvedColorScheme) { _, _ in
+        .onChange(of: colorScheme) { _, _ in
             syncDocumentChrome()
         }
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in

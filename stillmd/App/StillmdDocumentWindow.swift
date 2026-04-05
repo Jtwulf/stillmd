@@ -39,7 +39,7 @@ final class StillmdDocumentWindow: NSWindow, NSWindowDelegate {
         minSize = NSSize(width: WindowDefaults.minimumWidth, height: WindowDefaults.minimumHeight)
 
         let initialTitle = initialFileURL?.lastPathComponent ?? "stillmd"
-        let initialScheme = themeState.resolvedColorScheme
+        let initialScheme = themeState.themePreference.resolvedColorScheme(using: NSApp.effectiveAppearance)
 
         chromeController.attach(
             window: self,
