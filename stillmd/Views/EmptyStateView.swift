@@ -12,7 +12,7 @@ struct EmptyStateView: View {
     }
 
     private var revealOffset: CGFloat {
-        reduceMotion || isPresented ? 0 : StillmdMotion.emptyReveal.offsetY
+        reduceMotion || isPresented ? 0 : StillmdMotion.windowEntrance.offsetY
     }
 
     var body: some View {
@@ -39,7 +39,7 @@ struct EmptyStateView: View {
         .opacity(revealOpacity)
         .offset(y: -10 + revealOffset)
         .animation(
-            StillmdMotion.animation(for: StillmdMotion.emptyReveal, reduceMotion: reduceMotion),
+            StillmdMotion.animation(for: StillmdMotion.windowEntrance, reduceMotion: reduceMotion),
             value: isPresented
         )
         .animation(

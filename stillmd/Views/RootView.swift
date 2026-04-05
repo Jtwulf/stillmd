@@ -5,12 +5,15 @@ struct RootView: View {
     @ObservedObject var windowManager: WindowManager
     @ObservedObject var pendingFileOpenCoordinator: PendingFileOpenCoordinator
     @EnvironmentObject private var themeState: ThemeState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject var findCommandBindings: FindCommandBindings
     @Environment(\.documentChromeController) private var documentChromeController
 
-    /// `EmptyStateView` は `isPresented == false` のとき不透明度 0 になる。初期 false のまま非同期で true にすると
-    /// 起動直後ずっと透明のまま白い `NSHostingView` だけが見える。
-    @State private var isEmptyStatePresented = true
+    /// `EmptyStateView` は初回表示だけ `windowEntrance` を通す。
+    /// 背景は先に描画されるので、`false -> true` の遷移でも白抜けしない。
+    @State private var isEmptyStatePresented = false
+    @State private var emptyStateRevealTask: Task<Void, Never>?
+    @State private var emptyStateRevealScheduleID = 0
     @State private var isDropTargeted = false
 
     private var themePreference: ThemePreference {
@@ -37,16 +40,22 @@ struct RootView: View {
         .focusedSceneValue(\.findPreviousAction, findCommandBindings.findPreviousAction)
         .onAppear {
             if documentSession.fileURL != nil {
+                emptyStateRevealTask?.cancel()
+                emptyStateRevealTask = nil
                 isEmptyStatePresented = false
             } else if consumePendingURLs() {
+                emptyStateRevealTask?.cancel()
+                emptyStateRevealTask = nil
                 isEmptyStatePresented = false
             } else {
-                isEmptyStatePresented = true
+                scheduleEmptyStateReveal()
             }
             syncDocumentChrome()
         }
         .onChange(of: pendingFileOpenCoordinator.pendingChangeID) { _, _ in
             if consumePendingURLs() {
+                emptyStateRevealTask?.cancel()
+                emptyStateRevealTask = nil
                 isEmptyStatePresented = false
             }
             syncDocumentChrome()
@@ -56,6 +65,10 @@ struct RootView: View {
         }
         .onChange(of: themeState.themePreference) { _, _ in
             syncDocumentChrome()
+        }
+        .onDisappear {
+            emptyStateRevealTask?.cancel()
+            emptyStateRevealTask = nil
         }
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
             handleDrop(providers)
@@ -113,12 +126,39 @@ struct RootView: View {
     }
 
     private func openFileInCurrentWindow() {
+        emptyStateRevealTask?.cancel()
+        emptyStateRevealTask = nil
         let panel = NSOpenPanel()
         FileValidation.configureOpenPanel(panel, allowsMultipleSelection: false)
         if panel.runModal() == .OK, let url = panel.url {
             documentSession.fileURL = url
             isEmptyStatePresented = false
             syncDocumentChrome()
+        }
+    }
+
+    private func scheduleEmptyStateReveal() {
+        emptyStateRevealTask?.cancel()
+        emptyStateRevealTask = nil
+
+        emptyStateRevealScheduleID += 1
+        let scheduleID = emptyStateRevealScheduleID
+        isEmptyStatePresented = false
+
+        if reduceMotion {
+            isEmptyStatePresented = true
+            return
+        }
+
+        emptyStateRevealTask = Task { @MainActor in
+            await Task.yield()
+            guard
+                !Task.isCancelled,
+                emptyStateRevealScheduleID == scheduleID,
+                documentSession.fileURL == nil
+            else { return }
+            isEmptyStatePresented = true
+            emptyStateRevealTask = nil
         }
     }
 
