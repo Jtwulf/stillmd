@@ -103,6 +103,26 @@ private func evaluateJavaScriptString(_ script: String, in webView: WKWebView) a
     }
 }
 
+@MainActor
+private func waitForJavaScriptInt(
+    _ script: String,
+    in webView: WKWebView,
+    timeoutSeconds: Double = 10
+) async throws -> Int {
+    let deadline = Date().addingTimeInterval(timeoutSeconds)
+    var lastValue = 0
+
+    while Date() < deadline {
+        lastValue = try await evaluateJavaScriptInt(script, in: webView)
+        if lastValue > 0 {
+            return lastValue
+        }
+        try? await Task.sleep(for: .milliseconds(250))
+    }
+
+    return lastValue
+}
+
 // MARK: - Task 2.2: Property Test — File Extension Validation (Property 1)
 // **Validates: Requirements 2.4**
 
@@ -354,14 +374,17 @@ struct HTMLTemplateUnitTests {
     private let sampleCSS = "body { color: black; }"
     private let sampleMarkedJS = "// marked.js mock"
     private let sampleHighlightJS = "// highlight.js mock"
+    private let sampleMermaidJS = "// mermaid.js mock"
 
-    private func buildHTML(from markdown: String) -> String {
+    private func buildHTML(from markdown: String, mermaidJS: String? = nil, initialFindQuery: String = "") -> String {
         HTMLTemplate.build(
             markdownContent: markdown,
             markedJS: sampleMarkedJS,
             highlightJS: sampleHighlightJS,
             css: sampleCSS,
-            resolvedTheme: "light"
+            resolvedTheme: "light",
+            initialFindQuery: initialFindQuery,
+            mermaidJS: mermaidJS
         )
     }
 
@@ -392,6 +415,29 @@ struct HTMLTemplateUnitTests {
         #expect(html.contains("function renderCodeBlock"))
         #expect(html.contains("stillmd-code-block"))
         #expect(html.contains("stillmd-code-line-number"))
+    }
+
+    @Test("Contains Mermaid support only when Mermaid assets are provided")
+    func containsMermaidSupportWhenInjected() {
+        let plainHTML = buildHTML(from: "# Hello")
+        let mermaidHTML = buildHTML(
+            from: "```mermaid\ngraph LR\nA-->B\n```",
+            mermaidJS: sampleMermaidJS,
+            initialFindQuery: "graph"
+        )
+
+        #expect(!plainHTML.contains(sampleMermaidJS))
+        #expect(mermaidHTML.contains(sampleMermaidJS))
+        #expect(mermaidHTML.contains("stillmd-mermaid-block"))
+        #expect(mermaidHTML.contains("initialFindQuery"))
+    }
+
+    @Test("Mermaid fence detection only matches fenced Mermaid blocks")
+    func detectsMermaidFences() {
+        #expect(!HTMLTemplate.containsMermaidFence(in: "# Heading"))
+        #expect(HTMLTemplate.containsMermaidFence(in: "```mermaid\ngraph LR\nA-->B\n```"))
+        #expect(HTMLTemplate.containsMermaidFence(in: "   ~~~ MERMAID\nflowchart TD\n~~~"))
+        #expect(!HTMLTemplate.containsMermaidFence(in: "```swift\nlet x = 1\n```"))
     }
 
     // --- Dark Mode Detection ---
@@ -514,8 +560,14 @@ struct HTMLTemplateUnitTests {
         let html = buildHTML(from: "test")
         #expect(html.contains("document-line-number-overlay"))
         #expect(html.contains("document-line-number-column"))
+        #expect(html.contains("data-document-line-numbers-state=\"hidden\""))
+        #expect(html.contains("const documentLineNumberMotion = {"))
+        #expect(html.contains("function prefersReducedMotion()"))
+        #expect(html.contains("function setDocumentLineNumberState"))
         #expect(html.contains("function setDocumentLineNumbersVisible"))
         #expect(html.contains("scheduleDocumentLineNumberLayout"))
+        #expect(html.contains("documentLineNumberHideTimerID"))
+        #expect(html.contains("documentLineNumberRevealFrameID"))
     }
 
     @Test("Document line number layout aligns rows to column and uses one box per code line")
@@ -528,6 +580,9 @@ struct HTMLTemplateUnitTests {
         #expect(html.contains("globalMergeVisualLineRows"))
         #expect(html.contains("DOC_LINE_MERGE_EPSILON_GLOBAL_PX"))
         #expect(html.contains("rowRects"))
+        #expect(html.contains("setDocumentLineNumberState('visible')"))
+        #expect(html.contains("documentLineNumberRevealFrameID = requestAnimationFrame"))
+        #expect(html.contains("prefersReducedMotion()"))
     }
 
     @Test("Contains default code block line number decorator")
@@ -536,6 +591,13 @@ struct HTMLTemplateUnitTests {
         #expect(html.contains("stillmd-code-block"))
         #expect(html.contains("stillmd-code-line-number"))
         #expect(html.contains("function decorateCodeBlocks"))
+    }
+
+    @Test("Code block renderer normalizes only the terminal parser newline")
+    func codeBlockRendererNormalizesOnlyTerminalParserNewline() {
+        let html = buildHTML(from: "```text\nline 01\n```")
+        #expect(html.contains("const normalizedText = rawText.replace(/\\r?\\n$/, '');"))
+        #expect(html.contains("const lines = normalizedText.split(/\\r?\\n/);"))
     }
 
     // --- External Link Interception ---
@@ -596,6 +658,36 @@ struct WKWebViewConfigurationUnitTests {
 @MainActor
 struct WKWebViewIntegrationTests {
 
+    private func renderedCodeLineCount(from markdown: String) async throws -> Int {
+        let configuration = StillmdWebViewConfiguration.make(
+            userContentController: WKUserContentController()
+        )
+        let webView = WKWebView(
+            frame: NSRect(x: 0, y: 0, width: 900, height: 900),
+            configuration: configuration
+        )
+        let probe = WKNavigationProbe()
+        let baseURL = URL(
+            fileURLWithPath: FileManager.default.currentDirectoryPath,
+            isDirectory: true
+        )
+        let html = HTMLTemplate.build(
+            markdownContent: markdown,
+            markedJS: ResourceLoader.loadMarkedJS(),
+            highlightJS: ResourceLoader.loadHighlightJS(),
+            css: ResourceLoader.loadCSS(),
+            resolvedTheme: "light",
+            documentBaseURL: baseURL
+        )
+
+        try await probe.loadHTML(in: webView, html: html, baseURL: baseURL)
+
+        return try await evaluateJavaScriptInt(
+            "document.querySelectorAll('.stillmd-code-line').length",
+            in: webView
+        )
+    }
+
     @Test("Inline HTML still renders markdown without registered message handlers")
     func inlineHTMLRendersWithoutMessageHandlers() async throws {
         let configuration = StillmdWebViewConfiguration.make(
@@ -640,6 +732,97 @@ struct WKWebViewIntegrationTests {
             in: webView
         )
         #expect(headingCount == 1)
+    }
+
+    @Test("Mermaid diagrams render to SVG in WKWebView")
+    func mermaidDiagramRendersToSVG() async throws {
+        let markdown = """
+        ```mermaid
+        graph LR
+            A[Start] --> B[End]
+        ```
+        """
+
+        let configuration = StillmdWebViewConfiguration.make(
+            userContentController: WKUserContentController()
+        )
+        let webView = WKWebView(
+            frame: NSRect(x: 0, y: 0, width: 900, height: 900),
+            configuration: configuration
+        )
+        let probe = WKNavigationProbe()
+        let baseURL = URL(
+            fileURLWithPath: FileManager.default.currentDirectoryPath,
+            isDirectory: true
+        )
+        let html = HTMLTemplate.build(
+            markdownContent: markdown,
+            markedJS: ResourceLoader.loadMarkedJS(),
+            highlightJS: ResourceLoader.loadHighlightJS(),
+            css: ResourceLoader.loadCSS(),
+            resolvedTheme: "light",
+            documentBaseURL: baseURL,
+            mermaidJS: ResourceLoader.loadMermaidJS()
+        )
+
+        try await probe.loadHTML(in: webView, html: html, baseURL: baseURL)
+
+        let renderedCount = try await waitForJavaScriptInt(
+            "document.querySelectorAll('pre.stillmd-mermaid-block[data-stillmd-mermaid-state=\"rendered\"] svg').length",
+            in: webView
+        )
+        let fallbackCount = try await evaluateJavaScriptInt(
+            "document.querySelectorAll('pre.stillmd-mermaid-block[data-stillmd-mermaid-state=\"fallback\"]').length",
+            in: webView
+        )
+
+        #expect(renderedCount == 1)
+        #expect(fallbackCount == 0)
+    }
+
+    @Test("Invalid Mermaid source keeps fallback code visible")
+    func invalidMermaidSourceFallsBack() async throws {
+        let markdown = """
+        ```mermaid
+        not a diagram
+        ```
+        """
+
+        let configuration = StillmdWebViewConfiguration.make(
+            userContentController: WKUserContentController()
+        )
+        let webView = WKWebView(
+            frame: NSRect(x: 0, y: 0, width: 900, height: 900),
+            configuration: configuration
+        )
+        let probe = WKNavigationProbe()
+        let baseURL = URL(
+            fileURLWithPath: FileManager.default.currentDirectoryPath,
+            isDirectory: true
+        )
+        let html = HTMLTemplate.build(
+            markdownContent: markdown,
+            markedJS: ResourceLoader.loadMarkedJS(),
+            highlightJS: ResourceLoader.loadHighlightJS(),
+            css: ResourceLoader.loadCSS(),
+            resolvedTheme: "light",
+            documentBaseURL: baseURL,
+            mermaidJS: ResourceLoader.loadMermaidJS()
+        )
+
+        try await probe.loadHTML(in: webView, html: html, baseURL: baseURL)
+
+        let fallbackCount = try await waitForJavaScriptInt(
+            "document.querySelectorAll('pre.stillmd-mermaid-block[data-stillmd-mermaid-state=\"fallback\"] code.language-mermaid').length",
+            in: webView
+        )
+        let renderedCount = try await evaluateJavaScriptInt(
+            "document.querySelectorAll('pre.stillmd-mermaid-block[data-stillmd-mermaid-state=\"rendered\"] svg').length",
+            in: webView
+        )
+
+        #expect(fallbackCount == 1)
+        #expect(renderedCount == 0)
     }
 
     @Test("Code block line numbers align with rendered code rows in WKWebView")
@@ -725,6 +908,25 @@ struct WKWebViewIntegrationTests {
             #expect(heightDiff < 0.75, "Code line number height should match code row height")
             #expect(topDiff < 0.75, "Code line number top should match code row top")
         }
+    }
+
+    @Test("Code block rows keep internal blank lines but drop only the parser trailing newline")
+    func codeBlockRowsKeepIntentionalBlankLines() async throws {
+        let trailingNewlineOnly = """
+        ```text
+        line 01
+        ```
+        """
+        let internalBlankLine = """
+        ```text
+        line 01
+
+        line 03
+        ```
+        """
+
+        #expect(try await renderedCodeLineCount(from: trailingNewlineOnly) == 1)
+        #expect(try await renderedCodeLineCount(from: internalBlankLine) == 3)
     }
 }
 
@@ -1776,6 +1978,24 @@ struct CSSAndInfoPlistUnitTests {
         let css = try #require(try? String(contentsOf: cssURL!, encoding: .utf8))
         #expect(css.contains("[data-theme=\"dark\"]"),
                 "preview.css should contain [data-theme=\"dark\"] selector")
+    }
+
+    @Test("preview.css contains document line number motion selectors")
+    func cssContainsDocumentLineNumberMotionSelectors() throws {
+        let cssURL = Bundle.module.url(forResource: "preview", withExtension: "css")
+        let css = try #require(try? String(contentsOf: cssURL!, encoding: .utf8))
+        #expect(css.contains("--document-line-number-enter-duration"),
+                "preview.css should define the enter duration variable")
+        #expect(css.contains("--document-line-number-exit-duration"),
+                "preview.css should define the exit duration variable")
+        #expect(css.contains("[data-document-line-numbers-state=\"entering\"]"),
+                "preview.css should define the entering state selector")
+        #expect(css.contains("[data-document-line-numbers-state=\"visible\"]"),
+                "preview.css should define the visible state selector")
+        #expect(css.contains("[data-document-line-numbers-state=\"exiting\"]"),
+                "preview.css should define the exiting state selector")
+        #expect(css.contains("@media (prefers-reduced-motion: reduce)"),
+                "preview.css should disable motion for Reduce Motion")
     }
 
     @Test("preview.css font-family includes -apple-system")

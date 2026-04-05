@@ -4,7 +4,8 @@
 
 - stillmd の MVP は GitHub Flavored Markdown を対象にする
 - 表、タスクリスト、取り消し線、オートリンク、 fenced code block を正しく扱う
-- Mermaid、LaTeX、拡張プラグイン構文は初期スコープ外とする
+- Mermaid の fenced code block は本文中で図として描画する
+- LaTeX とその他の拡張プラグイン構文は初期スコープ外とする
 
 ## 描画方針
 
