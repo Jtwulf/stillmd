@@ -1,13 +1,24 @@
 import Foundation
 import Combine
 
+/// Markdown 本文と Mermaid 有無を一度に公開し、SwiftUI が中間状態の再描画を挟まないようにする。
+struct PreviewMarkdownPayload: Equatable, Sendable {
+    var content: String
+    var containsMermaidFence: Bool
+
+    static let empty = PreviewMarkdownPayload(content: "", containsMermaidFence: false)
+}
+
 @MainActor
 class PreviewViewModel: ObservableObject {
     let fileURL: URL
-    @Published var markdownContent: String = ""
-    /// Derived when `markdownContent` changes; avoids re-scanning the full document on every WebView update.
-    @Published private(set) var containsMermaidFence: Bool = false
+    @Published private(set) var markdownPayload: PreviewMarkdownPayload = .empty
     @Published var errorMessage: String? = nil
+
+    /// `markdownPayload` の投影（テスト・ビュー互換）。
+    var markdownContent: String { markdownPayload.content }
+    /// `markdownPayload` の投影。
+    var containsMermaidFence: Bool { markdownPayload.containsMermaidFence }
     @Published var scrollPosition: CGFloat = 0
 
     private var fileWatcher: FileWatcher?
@@ -59,9 +70,11 @@ class PreviewViewModel: ObservableObject {
     func loadFile() {
         do {
             let newContent = try String(contentsOf: fileURL, encoding: .utf8)
-            if newContent != markdownContent {
-                markdownContent = newContent
-                containsMermaidFence = HTMLTemplate.containsMermaidFence(in: newContent)
+            if newContent != markdownPayload.content {
+                markdownPayload = PreviewMarkdownPayload(
+                    content: newContent,
+                    containsMermaidFence: HTMLTemplate.containsMermaidFence(in: newContent)
+                )
             }
             errorMessage = nil
             recoveryTask?.cancel()
