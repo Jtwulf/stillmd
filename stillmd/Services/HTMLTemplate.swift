@@ -8,7 +8,7 @@ enum HTMLTemplate {
         css: String,
         initialScrollPosition: Double = 0,
         themePreference: String = ThemePreference.system.rawValue,
-        resolvedTheme: String? = nil,
+        resolvedTheme: String,
         textScale: Double = AppPreferences.defaultTextScale,
         documentLineNumbersVisible: Bool = false,
         documentBaseURL: URL? = nil
@@ -19,14 +19,7 @@ enum HTMLTemplate {
         let escapedThemePreference = themePreference
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
-        let resolvedThemeValue: String = {
-            if let resolvedTheme {
-                return resolvedTheme
-            }
-            let preference = ThemePreference(rawValue: themePreference) ?? .system
-            return preference.colorScheme?.stillmdThemeName ?? "light"
-        }()
-        let escapedResolvedThemeValue = resolvedThemeValue
+        let escapedResolvedThemeValue = resolvedTheme
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
         let baseTag = documentBaseURL.map { url in
@@ -513,9 +506,7 @@ enum HTMLTemplate {
 
                 function setThemePreference(nextThemePreference, nextResolvedTheme) {
                     viewerState.themePreference = nextThemePreference || 'system';
-                    if (nextResolvedTheme) {
-                        viewerState.resolvedTheme = nextResolvedTheme;
-                    }
+                    viewerState.resolvedTheme = nextResolvedTheme;
                     applyTheme();
                     scheduleDocumentLineNumberLayout();
                 }

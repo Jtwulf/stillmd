@@ -277,7 +277,8 @@ struct GFMConversionPropertyTests {
             markdownContent: markdown,
             markedJS: "// mock marked.js",
             highlightJS: "// mock highlight.js",
-            css: "/* mock css */"
+            css: "/* mock css */",
+            resolvedTheme: "light"
         )
     }
 
@@ -359,7 +360,8 @@ struct HTMLTemplateUnitTests {
             markdownContent: markdown,
             markedJS: sampleMarkedJS,
             highlightJS: sampleHighlightJS,
-            css: sampleCSS
+            css: sampleCSS,
+            resolvedTheme: "light"
         )
     }
 
@@ -495,6 +497,7 @@ struct HTMLTemplateUnitTests {
             markedJS: sampleMarkedJS,
             highlightJS: sampleHighlightJS,
             css: sampleCSS,
+            resolvedTheme: "light",
             documentBaseURL: baseURL
         )
         #expect(html.contains("<base href=\"file:///Users/example/Doc&#39;s/\">"))
@@ -608,6 +611,7 @@ struct WKWebViewIntegrationTests {
             markedJS: ResourceLoader.loadMarkedJS(),
             highlightJS: ResourceLoader.loadHighlightJS(),
             css: ResourceLoader.loadCSS(),
+            resolvedTheme: "light",
             documentBaseURL: URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
         )
 
@@ -674,6 +678,7 @@ struct WKWebViewIntegrationTests {
             markedJS: ResourceLoader.loadMarkedJS(),
             highlightJS: ResourceLoader.loadHighlightJS(),
             css: ResourceLoader.loadCSS(),
+            resolvedTheme: "light",
             documentBaseURL: baseURL
         )
 
@@ -1868,7 +1873,8 @@ struct AutolinksPropertyTests {
             markdownContent: markdown,
             markedJS: "// mock marked.js",
             highlightJS: "// mock highlight.js",
-            css: "/* mock css */"
+            css: "/* mock css */",
+            resolvedTheme: "light"
         )
     }
 
@@ -1968,7 +1974,8 @@ struct CodeBlockHighlightingPropertyTests {
             markdownContent: markdown,
             markedJS: "// mock marked.js",
             highlightJS: "// mock highlight.js",
-            css: "/* mock css */"
+            css: "/* mock css */",
+            resolvedTheme: "light"
         )
     }
 
