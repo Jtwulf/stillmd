@@ -2,6 +2,13 @@
 
 stillmd bundles a small set of third-party assets for Markdown parsing and syntax highlighting.
 
+## mermaid
+
+- Project: [mermaid](https://github.com/mermaid-js/mermaid)
+- Bundled file: `stillmd/Resources/mermaid.min.js`
+- Bundled version: `v11.14.0`
+- License: MIT
+
 ## marked
 
 - Project: [marked](https://github.com/markedjs/marked)

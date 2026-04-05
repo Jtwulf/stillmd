@@ -12,6 +12,7 @@ stillmd is built for reading Markdown, not managing it. It opens local `.md` and
 
 - Opens `.md` and `.markdown` files
 - Renders GitHub Flavored Markdown
+- Renders Mermaid diagrams in fenced code blocks
 - Highlights fenced code blocks
 - Resolves relative images and links
 - Auto-reloads when the file changes

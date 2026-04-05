@@ -14,6 +14,7 @@ let package = Package(
             resources: [
                 .copy("Resources/marked.min.js"),
                 .copy("Resources/highlight.min.js"),
+                .copy("Resources/mermaid.min.js"),
                 .copy("Resources/preview.css")
             ]
         ),
