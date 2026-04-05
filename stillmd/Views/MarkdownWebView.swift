@@ -70,6 +70,7 @@ struct MarkdownWebView: NSViewRepresentable {
     let baseURL: URL
     @Binding var scrollPosition: CGFloat
     let themePreference: ThemePreference
+    let resolvedColorScheme: ColorScheme
     let textScale: Double
     let documentLineNumbersVisible: Bool
     let findQuery: String
@@ -101,6 +102,7 @@ struct MarkdownWebView: NSViewRepresentable {
             css: ResourceLoader.loadCSS(),
             initialScrollPosition: Double(scrollPosition),
             themePreference: themePreference.rawValue,
+            resolvedTheme: resolvedColorScheme.stillmdThemeName,
             textScale: textScale,
             documentLineNumbersVisible: documentLineNumbersVisible,
             documentBaseURL: baseURL
@@ -109,6 +111,7 @@ struct MarkdownWebView: NSViewRepresentable {
 
         context.coordinator.lastContent = markdownContent
         context.coordinator.lastThemePreference = themePreference.rawValue
+        context.coordinator.lastResolvedTheme = resolvedColorScheme.stillmdThemeName
         context.coordinator.lastTextScale = textScale
         context.coordinator.lastDocumentLineNumbersVisible = documentLineNumbersVisible
         context.coordinator.lastFindQuery = findQuery
@@ -152,10 +155,16 @@ struct MarkdownWebView: NSViewRepresentable {
     }
 
     private func applyAppearanceAndFindState(to webView: WKWebView, context: Context) {
-        if context.coordinator.lastThemePreference != themePreference.rawValue {
+        let resolvedTheme = resolvedColorScheme.stillmdThemeName
+
+        if
+            context.coordinator.lastThemePreference != themePreference.rawValue ||
+            context.coordinator.lastResolvedTheme != resolvedTheme
+        {
             context.coordinator.lastThemePreference = themePreference.rawValue
+            context.coordinator.lastResolvedTheme = resolvedTheme
             evaluateJavaScript(
-                "setThemePreference(\(Self.javaScriptStringLiteral(themePreference.rawValue)));",
+                "setThemePreference(\(Self.javaScriptStringLiteral(themePreference.rawValue)), \(Self.javaScriptStringLiteral(resolvedTheme)));",
                 in: webView
             )
         }
@@ -215,6 +224,7 @@ struct MarkdownWebView: NSViewRepresentable {
         private var didReportInitialNavigationCommit = false
         var lastContent: String = ""
         var lastThemePreference: String = ThemePreference.system.rawValue
+        var lastResolvedTheme: String = ColorScheme.light.stillmdThemeName
         var lastTextScale: Double = AppPreferences.defaultTextScale
         var lastDocumentLineNumbersVisible: Bool = false
         var lastFindQuery: String = ""

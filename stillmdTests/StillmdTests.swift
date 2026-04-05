@@ -394,10 +394,12 @@ struct HTMLTemplateUnitTests {
 
     // --- Dark Mode Detection ---
 
-    @Test("Contains prefers-color-scheme media query")
-    func containsDarkModeDetection() {
+    @Test("Contains explicit resolved theme state")
+    func containsResolvedThemeState() {
         let html = buildHTML(from: "test")
-        #expect(html.contains("prefers-color-scheme"))
+        #expect(html.contains("const initialResolvedTheme ="))
+        #expect(html.contains("viewerState.resolvedTheme"))
+        #expect(!html.contains("prefers-color-scheme"))
     }
 
     // --- Message Handlers ---
@@ -1349,6 +1351,17 @@ struct AppPreferencesUnitTests {
     func themePreferencesMapToColorSchemes() {
         #expect(ThemePreference.light.colorScheme == .light)
         #expect(ThemePreference.dark.colorScheme == .dark)
+    }
+
+    @Test("ThemePreference resolves system appearance explicitly")
+    func themePreferenceResolvesSystemAppearance() {
+        let lightAppearance = NSAppearance(named: .aqua)!
+        let darkAppearance = NSAppearance(named: .darkAqua)!
+
+        #expect(ThemePreference.system.resolvedColorScheme(using: lightAppearance) == .light)
+        #expect(ThemePreference.system.resolvedColorScheme(using: darkAppearance) == .dark)
+        #expect(ThemePreference.light.resolvedColorScheme(using: darkAppearance) == .light)
+        #expect(ThemePreference.dark.resolvedColorScheme(using: lightAppearance) == .dark)
     }
 
     @Test("Text scale is clamped to supported range")

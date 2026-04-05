@@ -10,7 +10,8 @@ final class StillmdDocumentWindow: NSWindow, NSWindowDelegate {
     init(
         initialFileURL: URL?,
         windowManager: WindowManager,
-        pendingCoordinator: PendingFileOpenCoordinator
+        pendingCoordinator: PendingFileOpenCoordinator,
+        themeState: ThemeState
     ) {
         let session = DocumentWindowSession(fileURL: initialFileURL)
         self.session = session
@@ -36,7 +37,7 @@ final class StillmdDocumentWindow: NSWindow, NSWindowDelegate {
         minSize = NSSize(width: WindowDefaults.minimumWidth, height: WindowDefaults.minimumHeight)
 
         let initialTitle = initialFileURL?.lastPathComponent ?? "stillmd"
-        let initialScheme = DocumentWindowChromeBootstrap.initialColorSchemeForNewWindow()
+        let initialScheme = themeState.resolvedColorScheme
 
         chromeController.attach(
             window: self,
@@ -51,6 +52,7 @@ final class StillmdDocumentWindow: NSWindow, NSWindowDelegate {
             windowManager: windowManager,
             pendingFileOpenCoordinator: pendingCoordinator
         )
+        .environmentObject(themeState)
         .environment(\.documentChromeController, chromeController)
 
         let hostingView = NSHostingView(rootView: rootView)
@@ -71,7 +73,7 @@ final class StillmdDocumentWindow: NSWindow, NSWindowDelegate {
     }
 
     required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
+        fatalError("init(coder: has not been implemented)")
     }
 }
 
@@ -80,12 +82,14 @@ enum DocumentWindowFactory {
     static func openDocument(
         initialURL: URL? = nil,
         windowManager: WindowManager,
-        pendingCoordinator: PendingFileOpenCoordinator
+        pendingCoordinator: PendingFileOpenCoordinator,
+        themeState: ThemeState
     ) {
         let window = StillmdDocumentWindow(
             initialFileURL: initialURL,
             windowManager: windowManager,
-            pendingCoordinator: pendingCoordinator
+            pendingCoordinator: pendingCoordinator,
+            themeState: themeState
         )
         guard let appDelegate = NSApplication.shared.delegate as? AppDelegate else { return }
         appDelegate.trackDocumentWindow(window)

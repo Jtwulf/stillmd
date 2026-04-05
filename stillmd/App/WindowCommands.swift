@@ -3,13 +3,15 @@ import SwiftUI
 struct FileCommands: Commands {
     let windowManager: WindowManager
     let pendingCoordinator: PendingFileOpenCoordinator
+    let themeState: ThemeState
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
             Button("New Window") {
                 DocumentWindowFactory.openDocument(
                     windowManager: windowManager,
-                    pendingCoordinator: pendingCoordinator
+                    pendingCoordinator: pendingCoordinator,
+                    themeState: themeState
                 )
             }
             .keyboardShortcut("n", modifiers: .command)

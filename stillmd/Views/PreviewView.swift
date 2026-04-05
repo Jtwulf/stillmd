@@ -4,9 +4,8 @@ struct PreviewView: View {
     let fileURL: URL
     @ObservedObject var windowManager: WindowManager
     @StateObject private var viewModel: PreviewViewModel
+    @EnvironmentObject private var themeState: ThemeState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage(AppPreferences.themeKey) private var themePreferenceRawValue =
-        ThemePreference.system.rawValue
     @AppStorage(AppPreferences.textScaleKey) private var textScale = AppPreferences.defaultTextScale
 
     @State private var isFindBarPresented = false
@@ -28,7 +27,7 @@ struct PreviewView: View {
     }
 
     private var themePreference: ThemePreference {
-        ThemePreference(rawValue: themePreferenceRawValue) ?? .system
+        themeState.themePreference
     }
 
     private var shouldKeepPreviewVisible: Bool {
@@ -113,6 +112,7 @@ struct PreviewView: View {
                     baseURL: fileURL.deletingLastPathComponent(),
                     scrollPosition: $viewModel.scrollPosition,
                     themePreference: themePreference,
+                    resolvedColorScheme: themeState.resolvedColorScheme,
                     textScale: AppPreferences.clampedTextScale(textScale),
                     documentLineNumbersVisible: isDocumentLineNumbersPresented,
                     findQuery: findQuery,
