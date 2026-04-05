@@ -6,9 +6,10 @@ struct MotionSpec {
 }
 
 enum StillmdMotion {
-    static let emptyReveal = MotionSpec(duration: 0.18, offsetY: 5)
-    /// Same timing as `emptyReveal`; used for Markdown preview / error pane entrance.
-    static let previewReveal = MotionSpec(duration: 0.18, offsetY: 5)
+    static let windowEntrance = MotionSpec(duration: 0.18, offsetY: 5)
+    static let emptyReveal = windowEntrance
+    /// Same timing as `windowEntrance`; used for Markdown preview / error pane entrance.
+    static let previewReveal = windowEntrance
     static let findBarInsertion = MotionSpec(duration: 0.14, offsetY: -4)
     static let findBarRemoval = MotionSpec(duration: 0.10, offsetY: -3)
 

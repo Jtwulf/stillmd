@@ -49,11 +49,13 @@ struct PreviewView: View {
         isFindBarChromeReserved || (viewModel.errorMessage != nil && shouldKeepPreviewVisible)
     }
 
-    /// Always visible: `schedulePreviewReveal` / `didCommit` / `onAppear` の順で `isPreviewRevealed` が false に戻る
-    /// レースがあり、不透明度 0 のまま固定されることがある（本文は読み込めているのに真っ白に見える）。
-    private var previewRevealOpacity: Double { 1 }
+    private var previewRevealOpacity: Double {
+        reduceMotion || isPreviewRevealed ? 1 : 0
+    }
 
-    private var previewRevealOffset: CGFloat { 0 }
+    private var previewRevealOffset: CGFloat {
+        reduceMotion || isPreviewRevealed ? 0 : StillmdMotion.previewReveal.offsetY
+    }
 
     var body: some View {
         // Use a plain `VStack` instead of `safeAreaInset`: inside `NSHostingView` + fullSizeContentView,
