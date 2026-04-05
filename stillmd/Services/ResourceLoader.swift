@@ -9,6 +9,10 @@ enum ResourceLoader {
         loadBundleResource(name: "highlight.min", ext: "js")
     }
 
+    static func loadMermaidJS() -> String {
+        loadBundleResource(name: "mermaid.min", ext: "js")
+    }
+
     static func loadCSS() -> String {
         loadBundleResource(name: "preview", ext: "css")
     }

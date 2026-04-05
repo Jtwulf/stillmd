@@ -94,6 +94,7 @@ struct MarkdownWebView: NSViewRepresentable {
         webView.setValue(true, forKey: "drawsBackground")
         webView.wantsLayer = true
 
+        let containsMermaidFence = HTMLTemplate.containsMermaidFence(in: markdownContent)
         let html = HTMLTemplate.build(
             markdownContent: markdownContent,
             markedJS: ResourceLoader.loadMarkedJS(),
@@ -103,7 +104,9 @@ struct MarkdownWebView: NSViewRepresentable {
             themePreference: themePreference.rawValue,
             textScale: textScale,
             documentLineNumbersVisible: documentLineNumbersVisible,
-            documentBaseURL: baseURL
+            documentBaseURL: baseURL,
+            initialFindQuery: findQuery,
+            mermaidJS: containsMermaidFence ? ResourceLoader.loadMermaidJS() : nil
         )
         webView.loadHTMLString(html, baseURL: baseURL)
 
@@ -112,6 +115,7 @@ struct MarkdownWebView: NSViewRepresentable {
         context.coordinator.lastTextScale = textScale
         context.coordinator.lastDocumentLineNumbersVisible = documentLineNumbersVisible
         context.coordinator.lastFindQuery = findQuery
+        context.coordinator.lastContainsMermaidFence = containsMermaidFence
 
         return StillmdMarkdownWebContainerView(webView: webView)
     }
@@ -133,11 +137,38 @@ struct MarkdownWebView: NSViewRepresentable {
     func updateNSView(_ container: StillmdMarkdownWebContainerView, context: Context) {
         let webView = container.webView
         context.coordinator.parent = self
+        let containsMermaidFence = HTMLTemplate.containsMermaidFence(in: markdownContent)
 
         guard markdownContent != context.coordinator.lastContent else {
             applyAppearanceAndFindState(to: webView, context: context)
             return
         }
+
+        if containsMermaidFence != context.coordinator.lastContainsMermaidFence {
+            context.coordinator.lastContent = markdownContent
+            context.coordinator.lastThemePreference = themePreference.rawValue
+            context.coordinator.lastTextScale = textScale
+            context.coordinator.lastDocumentLineNumbersVisible = documentLineNumbersVisible
+            context.coordinator.lastFindQuery = findQuery
+            context.coordinator.lastContainsMermaidFence = containsMermaidFence
+
+            let html = HTMLTemplate.build(
+                markdownContent: markdownContent,
+                markedJS: ResourceLoader.loadMarkedJS(),
+                highlightJS: ResourceLoader.loadHighlightJS(),
+                css: ResourceLoader.loadCSS(),
+                initialScrollPosition: Double(scrollPosition),
+                themePreference: themePreference.rawValue,
+                textScale: textScale,
+                documentLineNumbersVisible: documentLineNumbersVisible,
+                documentBaseURL: baseURL,
+                initialFindQuery: findQuery,
+                mermaidJS: containsMermaidFence ? ResourceLoader.loadMermaidJS() : nil
+            )
+            webView.loadHTMLString(html, baseURL: baseURL)
+            return
+        }
+
         context.coordinator.lastContent = markdownContent
 
         evaluateJavaScript(
@@ -219,6 +250,7 @@ struct MarkdownWebView: NSViewRepresentable {
         var lastDocumentLineNumbersVisible: Bool = false
         var lastFindQuery: String = ""
         var lastFindRequestID: Int?
+        var lastContainsMermaidFence: Bool = false
 
         init(_ parent: MarkdownWebView) {
             self.parent = parent

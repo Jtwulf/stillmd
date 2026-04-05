@@ -1,6 +1,13 @@
 import Foundation
 
 enum HTMLTemplate {
+    static func containsMermaidFence(in markdownContent: String) -> Bool {
+        markdownContent.range(
+            of: #"(?m)^[ \t]{0,3}(?:```|~~~)[ \t]*mermaid(?:[ \t].*)?$"#,
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil
+    }
+
     static func build(
         markdownContent: String,
         markedJS: String,
@@ -10,7 +17,9 @@ enum HTMLTemplate {
         themePreference: String = ThemePreference.system.rawValue,
         textScale: Double = AppPreferences.defaultTextScale,
         documentLineNumbersVisible: Bool = false,
-        documentBaseURL: URL? = nil
+        documentBaseURL: URL? = nil,
+        initialFindQuery: String = "",
+        mermaidJS: String? = nil
     ) -> String {
         // Base64 keeps `${…}`, backticks, quotes, and `</script>` from breaking out of the HTML `<script>` block
         // or being interpreted as JS (template literals / unterminated strings → blank WebView).
@@ -18,6 +27,12 @@ enum HTMLTemplate {
         let escapedThemePreference = themePreference
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
+        let escapedInitialFindQuery = initialFindQuery
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\r", with: "\\r")
+            .replacingOccurrences(of: "\n", with: "\\n")
+        let mermaidScriptTag = mermaidJS.map { "<script>\($0)</script>" } ?? ""
         let baseTag = documentBaseURL.map { url in
             let href = url.absoluteString
                 .replacingOccurrences(of: "&", with: "&amp;")
@@ -38,6 +53,7 @@ enum HTMLTemplate {
             <style>\(css)</style>
             <script>\(markedJS)</script>
             <script>\(highlightJS)</script>
+            \(mermaidScriptTag)
         </head>
         <body>
             <div id="document-line-number-overlay" aria-hidden="true">
@@ -95,9 +111,10 @@ enum HTMLTemplate {
                 const initialThemePreference = "\(escapedThemePreference)";
                 const initialTextScale = \(textScale);
                 const initialDocumentLineNumbersVisible = \(documentLineNumbersVisible ? "true" : "false");
+                const initialFindQuery = "\(escapedInitialFindQuery)";
                 const viewerState = {
                     themePreference: initialThemePreference,
-                    findQuery: '',
+                    findQuery: initialFindQuery,
                     documentLineNumbersVisible: initialDocumentLineNumbersVisible,
                 };
                 const documentLineNumberMotion = {
@@ -109,6 +126,8 @@ enum HTMLTemplate {
                 let findMatches = [];
                 let findState = { currentIndex: -1 };
                 let documentLineNumberLayoutPending = false;
+                let mermaidRenderGeneration = 0;
+                let mermaidRenderSequence = 0;
                 let documentLineNumberRevealFrameID = 0;
                 let documentLineNumberHideTimerID = 0;
                 window.__stillmdBootPhase = 'state-ready';
@@ -154,9 +173,13 @@ enum HTMLTemplate {
                     return '';
                 }
 
+                function isMermaidBlock(codeElement) {
+                    return getCodeLanguage(codeElement) === 'mermaid';
+                }
+
                 function renderCodeBlock(codeElement) {
                     const pre = codeElement.parentElement;
-                    if (!pre || pre.dataset.stillmdCodeDecorated === 'true') {
+                    if (!pre || pre.dataset.stillmdCodeDecorated === 'true' || isMermaidBlock(codeElement)) {
                         return;
                     }
 
@@ -213,6 +236,134 @@ enum HTMLTemplate {
                     const codeBlocks = contentElement.querySelectorAll('pre > code');
                     for (const codeElement of codeBlocks) {
                         renderCodeBlock(codeElement);
+                    }
+                }
+
+                function decorateMermaidBlocks() {
+                    const mermaidCodeBlocks = contentElement.querySelectorAll('pre > code');
+                    for (const codeElement of mermaidCodeBlocks) {
+                        if (!isMermaidBlock(codeElement)) {
+                            continue;
+                        }
+
+                        const pre = codeElement.parentElement;
+                        if (!pre || pre.dataset.stillmdMermaidDecorated === 'true') {
+                            continue;
+                        }
+
+                        pre.dataset.stillmdMermaidDecorated = 'true';
+                        pre.dataset.stillmdMermaidSource = codeElement.textContent || '';
+                        pre.dataset.stillmdMermaidState = 'fallback';
+                        pre.classList.add('stillmd-mermaid-block');
+                    }
+                }
+
+                function getResolvedMermaidTheme() {
+                    return viewerState.themePreference === 'system'
+                        ? (mediaQuery.matches ? 'dark' : 'default')
+                        : (viewerState.themePreference === 'dark' ? 'dark' : 'default');
+                }
+
+                function configureMermaid() {
+                    if (typeof mermaid === 'undefined' || typeof mermaid.initialize !== 'function') {
+                        return false;
+                    }
+
+                    try {
+                        mermaid.initialize({
+                            startOnLoad: false,
+                            securityLevel: 'strict',
+                            theme: getResolvedMermaidTheme(),
+                            fontFamily: getComputedStyle(document.body).fontFamily,
+                        });
+                        return true;
+                    } catch (error) {
+                        return false;
+                    }
+                }
+
+                function setMermaidFallback(pre, source) {
+                    pre.dataset.stillmdMermaidState = 'fallback';
+                    pre.innerHTML = `<code class="language-mermaid">${escapeHTML(source)}</code>`;
+                }
+
+                function setMermaidRendered(pre, svg, bindFunctions) {
+                    pre.dataset.stillmdMermaidState = 'rendered';
+                    pre.innerHTML = svg;
+                    if (typeof bindFunctions === 'function') {
+                        try {
+                            bindFunctions(pre);
+                        } catch (error) {}
+                    }
+                }
+
+                async function renderMermaidBlock(pre, generation) {
+                    const source = pre.dataset.stillmdMermaidSource || '';
+                    if (generation !== mermaidRenderGeneration) {
+                        return;
+                    }
+
+                    if (!source) {
+                        setMermaidFallback(pre, source);
+                        return;
+                    }
+
+                    if (!configureMermaid()) {
+                        setMermaidFallback(pre, source);
+                        return;
+                    }
+
+                    try {
+                        const diagramId = `stillmd-mermaid-${generation}-${++mermaidRenderSequence}`;
+                        const result = await mermaid.render(diagramId, source);
+                        if (generation !== mermaidRenderGeneration) {
+                            return;
+                        }
+
+                        const svg = typeof result === 'string' ? result : result?.svg;
+                        const bindFunctions =
+                            result && typeof result === 'object' && typeof result.bindFunctions === 'function'
+                                ? result.bindFunctions
+                                : null;
+
+                        if (typeof svg !== 'string' || !svg) {
+                            throw new Error('Mermaid render returned no SVG');
+                        }
+
+                        setMermaidRendered(pre, svg, bindFunctions);
+                    } catch (error) {
+                        if (generation !== mermaidRenderGeneration) {
+                            return;
+                        }
+                        setMermaidFallback(pre, source);
+                    }
+                }
+
+                async function renderMermaidBlocks() {
+                    const mermaidBlocks = Array.from(
+                        contentElement.querySelectorAll('pre.stillmd-mermaid-block')
+                    );
+
+                    if (!mermaidBlocks.length) {
+                        return;
+                    }
+
+                    if (typeof mermaid === 'undefined') {
+                        for (const pre of mermaidBlocks) {
+                            setMermaidFallback(pre, pre.dataset.stillmdMermaidSource || '');
+                        }
+                        return;
+                    }
+
+                    mermaidRenderGeneration += 1;
+                    const generation = mermaidRenderGeneration;
+
+                    await Promise.all(
+                        mermaidBlocks.map((pre) => renderMermaidBlock(pre, generation))
+                    );
+
+                    if (generation === mermaidRenderGeneration) {
+                        scheduleDocumentLineNumberLayout();
                     }
                 }
 
@@ -409,14 +560,16 @@ enum HTMLTemplate {
                     });
                 }
 
-                function renderMarkdown(source) {
+                async function renderMarkdown(source) {
                     contentElement.innerHTML = marked.parse(source);
                     decorateCodeBlocks();
+                    decorateMermaidBlocks();
                     if (viewerState.findQuery) {
                         highlightMatches(viewerState.findQuery, true);
                     } else {
                         publishFindResults();
                     }
+                    await renderMermaidBlocks();
                     scheduleDocumentLineNumberLayout();
                 }
 
@@ -479,7 +632,11 @@ enum HTMLTemplate {
                                 if (!parent) {
                                     return NodeFilter.FILTER_REJECT;
                                 }
-                                if (parent.closest('script, style, mark[data-stillmd-find="true"]')) {
+                                if (
+                                    parent.closest(
+                                        'script, style, mark[data-stillmd-find="true"], pre.stillmd-mermaid-block'
+                                    )
+                                ) {
                                     return NodeFilter.FILTER_REJECT;
                                 }
                                 return NodeFilter.FILTER_ACCEPT;
@@ -577,6 +734,7 @@ enum HTMLTemplate {
                 function setThemePreference(nextThemePreference) {
                     viewerState.themePreference = nextThemePreference || 'system';
                     applyTheme();
+                    void renderMermaidBlocks();
                     scheduleDocumentLineNumberLayout();
                 }
 
@@ -671,8 +829,14 @@ enum HTMLTemplate {
 
                 // Global updateContent function for live reload
                 function updateContent(md, targetScrollY) {
-                    renderMarkdown(md);
-                    restoreScrollPosition(targetScrollY);
+                    renderMarkdown(md)
+                        .then(() => {
+                            restoreScrollPosition(targetScrollY);
+                        })
+                        .catch(error => {
+                            window.__stillmdLastError = error && error.stack ? String(error.stack) : String(error);
+                            restoreScrollPosition(targetScrollY);
+                        });
                 }
 
                 const resizeObserver = new ResizeObserver(() => {
@@ -683,10 +847,21 @@ enum HTMLTemplate {
                 window.addEventListener('resize', scheduleDocumentLineNumberLayout);
                 window.__stillmdBootPhase = 'before-render';
 
-                renderMarkdown(md);
-                window.__stillmdBootPhase = 'after-render';
-                restoreScrollPosition(initialScrollY);
-                window.__stillmdBootPhase = 'ready';
+                renderMarkdown(md)
+                    .then(() => {
+                        window.__stillmdBootPhase = 'after-render';
+                        restoreScrollPosition(initialScrollY);
+                        window.__stillmdBootPhase = 'ready';
+                    })
+                    .catch(error => {
+                        window.__stillmdBootPhase = 'caught-error';
+                        window.__stillmdLastError = error && error.stack ? String(error.stack) : String(error);
+                        const contentElement = document.getElementById('content');
+                        if (contentElement && !contentElement.innerHTML) {
+                            contentElement.innerHTML = '<pre class="stillmd-render-error"></pre>';
+                            contentElement.firstChild.textContent = window.__stillmdLastError;
+                        }
+                    });
                 } catch (error) {
                     window.__stillmdBootPhase = 'caught-error';
                     window.__stillmdLastError = error && error.stack ? String(error.stack) : String(error);
