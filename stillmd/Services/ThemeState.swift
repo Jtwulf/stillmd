@@ -6,13 +6,17 @@ import SwiftUI
 final class ThemeState: ObservableObject {
     static let shared = ThemeState()
 
+    private struct ObservationToken: @unchecked Sendable {
+        let value: NSObjectProtocol
+    }
+
     @Published private(set) var themePreference: ThemePreference = .system
     @Published private(set) var resolvedColorScheme: ColorScheme = .light
 
     private let userDefaults: UserDefaults
     private let notificationCenter: NotificationCenter
     private let distributedNotificationCenter: DistributedNotificationCenter
-    private var observationTokens: [NSObjectProtocol] = []
+    private var observationTokens: [ObservationToken] = []
 
     init(
         userDefaults: UserDefaults = .standard,
@@ -56,7 +60,7 @@ final class ThemeState: ObservableObject {
                 self?.scheduleThemeRefresh()
             }
         }
-        observationTokens.append(defaultsToken)
+        observationTokens.append(ObservationToken(value: defaultsToken))
 
         let appearanceToken = distributedNotificationCenter.addObserver(
             forName: Notification.Name("AppleInterfaceThemeChangedNotification"),
@@ -67,6 +71,13 @@ final class ThemeState: ObservableObject {
                 self?.scheduleThemeRefresh()
             }
         }
-        observationTokens.append(appearanceToken)
+        observationTokens.append(ObservationToken(value: appearanceToken))
+    }
+
+    deinit {
+        for token in observationTokens {
+            notificationCenter.removeObserver(token.value)
+            distributedNotificationCenter.removeObserver(token.value)
+        }
     }
 }

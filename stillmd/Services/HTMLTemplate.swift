@@ -506,7 +506,7 @@ enum HTMLTemplate {
 
                 function setThemePreference(nextThemePreference, nextResolvedTheme) {
                     viewerState.themePreference = nextThemePreference || 'system';
-                    viewerState.resolvedTheme = nextResolvedTheme;
+                    viewerState.resolvedTheme = nextResolvedTheme || 'light';
                     applyTheme();
                     scheduleDocumentLineNumberLayout();
                 }
