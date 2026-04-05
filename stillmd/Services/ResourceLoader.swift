@@ -1,16 +1,19 @@
 import Foundation
 
 enum ResourceLoader {
-    private static let lock = NSLock()
-    /// Guarded by `lock` for the whole read-or-load path (no `inout` across lock — see code review).
+    private static let markedLock = NSLock()
+    private static let highlightLock = NSLock()
+    private static let mermaidLock = NSLock()
+    private static let cssLock = NSLock()
+
     nonisolated(unsafe) private static var markedCache: String?
     nonisolated(unsafe) private static var highlightCache: String?
     nonisolated(unsafe) private static var mermaidCache: String?
     nonisolated(unsafe) private static var cssCache: String?
 
     static func loadMarkedJS() -> String {
-        lock.lock()
-        defer { lock.unlock() }
+        markedLock.lock()
+        defer { markedLock.unlock() }
         if let markedCache { return markedCache }
         let loaded = loadBundleResource(name: "marked.min", ext: "js")
         markedCache = loaded
@@ -18,8 +21,8 @@ enum ResourceLoader {
     }
 
     static func loadHighlightJS() -> String {
-        lock.lock()
-        defer { lock.unlock() }
+        highlightLock.lock()
+        defer { highlightLock.unlock() }
         if let highlightCache { return highlightCache }
         let loaded = loadBundleResource(name: "highlight.min", ext: "js")
         highlightCache = loaded
@@ -27,8 +30,8 @@ enum ResourceLoader {
     }
 
     static func loadMermaidJS() -> String {
-        lock.lock()
-        defer { lock.unlock() }
+        mermaidLock.lock()
+        defer { mermaidLock.unlock() }
         if let mermaidCache { return mermaidCache }
         let loaded = loadBundleResource(name: "mermaid.min", ext: "js")
         mermaidCache = loaded
@@ -36,8 +39,8 @@ enum ResourceLoader {
     }
 
     static func loadCSS() -> String {
-        lock.lock()
-        defer { lock.unlock() }
+        cssLock.lock()
+        defer { cssLock.unlock() }
         if let cssCache { return cssCache }
         let loaded = loadBundleResource(name: "preview", ext: "css")
         cssCache = loaded
