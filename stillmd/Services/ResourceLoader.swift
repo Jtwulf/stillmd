@@ -2,36 +2,45 @@ import Foundation
 
 enum ResourceLoader {
     private static let lock = NSLock()
-    /// Guarded by `lock`; `nonisolated(unsafe)` documents manual synchronization for Swift 6.
+    /// Guarded by `lock` for the whole read-or-load path (no `inout` across lock — see code review).
     nonisolated(unsafe) private static var markedCache: String?
     nonisolated(unsafe) private static var highlightCache: String?
     nonisolated(unsafe) private static var mermaidCache: String?
     nonisolated(unsafe) private static var cssCache: String?
 
     static func loadMarkedJS() -> String {
-        cached(&markedCache, name: "marked.min", ext: "js")
+        lock.lock()
+        defer { lock.unlock() }
+        if let markedCache { return markedCache }
+        let loaded = loadBundleResource(name: "marked.min", ext: "js")
+        markedCache = loaded
+        return loaded
     }
 
     static func loadHighlightJS() -> String {
-        cached(&highlightCache, name: "highlight.min", ext: "js")
+        lock.lock()
+        defer { lock.unlock() }
+        if let highlightCache { return highlightCache }
+        let loaded = loadBundleResource(name: "highlight.min", ext: "js")
+        highlightCache = loaded
+        return loaded
     }
 
     static func loadMermaidJS() -> String {
-        cached(&mermaidCache, name: "mermaid.min", ext: "js")
+        lock.lock()
+        defer { lock.unlock() }
+        if let mermaidCache { return mermaidCache }
+        let loaded = loadBundleResource(name: "mermaid.min", ext: "js")
+        mermaidCache = loaded
+        return loaded
     }
 
     static func loadCSS() -> String {
-        cached(&cssCache, name: "preview", ext: "css")
-    }
-
-    private static func cached(_ slot: inout String?, name: String, ext: String) -> String {
         lock.lock()
         defer { lock.unlock() }
-        if let cached = slot {
-            return cached
-        }
-        let loaded = loadBundleResource(name: name, ext: ext)
-        slot = loaded
+        if let cssCache { return cssCache }
+        let loaded = loadBundleResource(name: "preview", ext: "css")
+        cssCache = loaded
         return loaded
     }
 
