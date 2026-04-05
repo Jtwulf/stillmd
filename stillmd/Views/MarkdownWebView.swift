@@ -85,7 +85,7 @@ struct MarkdownWebView: NSViewRepresentable {
     @Binding var findStatus: FindStatus
     /// Fires once when the main-frame navigation commits content (`didCommit`), before subresources finish.
     var onInitialNavigationCommitted: (() -> Void)? = nil
-    /// Called synchronously at the start of `makeNSView` before `loadHTMLString` (for reveal timing vs WebKit).
+    /// Called synchronously at the start of `makeNSView` before `loadDocument` (for reveal timing vs WebKit).
     var onWillLoadWebContent: (() -> Void)? = nil
 
     func makeNSView(context: Context) -> StillmdMarkdownWebContainerView {
@@ -102,19 +102,12 @@ struct MarkdownWebView: NSViewRepresentable {
         webView.setValue(true, forKey: "drawsBackground")
         webView.wantsLayer = true
 
-        let html = HTMLTemplate.build(
+        loadDocument(
+            in: webView,
+            context: context,
             markdownContent: markdownContent,
-            markedJS: ResourceLoader.loadMarkedJS(),
-            highlightJS: ResourceLoader.loadHighlightJS(),
-            css: ResourceLoader.loadCSS(),
-            initialScrollPosition: Double(scrollPosition),
-            themePreference: themePreference.rawValue,
-            textScale: textScale,
-            documentBaseURL: baseURL,
-            initialFindQuery: findQuery,
-            mermaidJS: containsMermaidFence ? ResourceLoader.loadMermaidJS() : nil
+            containsMermaidFence: containsMermaidFence
         )
-        webView.loadHTMLString(html, baseURL: baseURL)
 
         context.coordinator.lastContent = markdownContent
         context.coordinator.lastThemePreference = themePreference.rawValue
@@ -154,19 +147,12 @@ struct MarkdownWebView: NSViewRepresentable {
             context.coordinator.lastFindQuery = findQuery
             context.coordinator.lastContainsMermaidFence = containsMermaidFence
 
-            let html = HTMLTemplate.build(
+            loadDocument(
+                in: webView,
+                context: context,
                 markdownContent: markdownContent,
-                markedJS: ResourceLoader.loadMarkedJS(),
-                highlightJS: ResourceLoader.loadHighlightJS(),
-                css: ResourceLoader.loadCSS(),
-                initialScrollPosition: Double(scrollPosition),
-                themePreference: themePreference.rawValue,
-                textScale: textScale,
-                documentBaseURL: baseURL,
-                initialFindQuery: findQuery,
-                mermaidJS: containsMermaidFence ? ResourceLoader.loadMermaidJS() : nil
+                containsMermaidFence: containsMermaidFence
             )
-            webView.loadHTMLString(html, baseURL: baseURL)
             return
         }
 
@@ -181,6 +167,41 @@ struct MarkdownWebView: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
+    }
+
+    private func loadDocument(
+        in webView: WKWebView,
+        context: Context,
+        markdownContent: String,
+        containsMermaidFence: Bool
+    ) {
+        let readAccessRootURL = FileManager.default.homeDirectoryForCurrentUser
+        let html = HTMLTemplate.build(
+            markdownContent: markdownContent,
+            markedJS: ResourceLoader.loadMarkedJS(),
+            highlightJS: ResourceLoader.loadHighlightJS(),
+            css: ResourceLoader.loadCSS(),
+            initialScrollPosition: Double(scrollPosition),
+            themePreference: themePreference.rawValue,
+            textScale: textScale,
+            documentBaseURL: baseURL,
+            initialFindQuery: findQuery,
+            mermaidJS: containsMermaidFence ? ResourceLoader.loadMermaidJS() : nil
+        )
+
+        guard let htmlDocument = context.coordinator.htmlDocument else {
+            StillmdWebViewLogger.log("temporary HTML document unavailable; falling back to loadHTMLString")
+            webView.loadHTMLString(html, baseURL: baseURL)
+            return
+        }
+
+        do {
+            try htmlDocument.write(html: html)
+            webView.loadFileURL(htmlDocument.fileURL, allowingReadAccessTo: readAccessRootURL)
+        } catch {
+            StillmdWebViewLogger.log("temporary HTML write failed: \(error.localizedDescription)")
+            webView.loadHTMLString(html, baseURL: baseURL)
+        }
     }
 
     private func applyAppearanceAndFindState(to webView: WKWebView, context: Context) {
@@ -236,6 +257,7 @@ struct MarkdownWebView: NSViewRepresentable {
 
     class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var parent: MarkdownWebView
+        let htmlDocument: TemporaryHTMLDocument?
         private var didReportInitialNavigationCommit = false
         var lastContent: String = ""
         var lastThemePreference: String = ThemePreference.defaultPreference.rawValue
@@ -246,6 +268,9 @@ struct MarkdownWebView: NSViewRepresentable {
 
         init(_ parent: MarkdownWebView) {
             self.parent = parent
+            self.htmlDocument = TemporaryHTMLDocument(
+                rootDirectory: FileManager.default.homeDirectoryForCurrentUser
+            )
         }
 
         // MARK: - WKNavigationDelegate
@@ -255,7 +280,7 @@ struct MarkdownWebView: NSViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            // `loadHTMLString` では環境によって `didCommit` が期待どおり来ないことがあるためフォールバック。
+            // `loadFileURL` / `loadHTMLString` では環境によって `didCommit` が期待どおり来ないことがあるためフォールバック。
             reportInitialNavigationIfNeeded()
             runDiagnostics(in: webView)
         }
