@@ -32,5 +32,5 @@ jobs:
             dist/*.sha256
           body: |
             - Built from tag `${{ github.ref_name }}`
-            - This release is currently unsigned and not notarized
+            - This release is ad hoc signed, not Developer ID signed, and not notarized
             - If macOS blocks the first launch, Control-click the app and choose `Open`

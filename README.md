@@ -34,7 +34,7 @@ stillmd is built for reading Markdown, not managing it. It opens local `.md` and
 2. Unzip the archive.
 3. Move `stillmd.app` into `/Applications` or another folder you prefer.
 
-The app is distributed without Developer ID signing or notarization.
+The release bundle is ad hoc signed, but it is not Developer ID signed or notarized.
 
 ## License
 

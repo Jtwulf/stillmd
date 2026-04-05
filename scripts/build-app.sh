@@ -92,6 +92,12 @@ else
     echo "  WARNING: Resource bundle not found. Resources may not load at runtime."
 fi
 
+# Sign the assembled bundle ad hoc so macOS can assess the bundle structure
+# correctly even when the app is distributed without Developer ID signing.
+codesign --force --deep --sign - "$APP_DIR"
+codesign --verify --deep --strict "$APP_DIR" >/dev/null
+echo "  Ad hoc signed app bundle"
+
 echo ""
 echo "=== Build complete ==="
 echo "  App: $APP_DIR"
