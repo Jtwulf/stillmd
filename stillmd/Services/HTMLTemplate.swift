@@ -41,7 +41,7 @@ enum HTMLTemplate {
         </head>
         <body>
             <div id="document-line-number-overlay" aria-hidden="true">
-                <div id="document-line-number-column"></div>
+                <div id="document-line-number-column" data-document-line-numbers-state="hidden"></div>
             </div>
             <div id="content"></div>
             <script>
@@ -100,10 +100,35 @@ enum HTMLTemplate {
                     findQuery: '',
                     documentLineNumbersVisible: initialDocumentLineNumbersVisible,
                 };
+                const documentLineNumberMotion = {
+                    enterDurationMs: 130,
+                    exitDurationMs: 100,
+                    enterOffsetPx: -4,
+                    exitOffsetPx: -2,
+                };
                 let findMatches = [];
                 let findState = { currentIndex: -1 };
                 let documentLineNumberLayoutPending = false;
+                let documentLineNumberRevealFrameID = 0;
+                let documentLineNumberHideTimerID = 0;
                 window.__stillmdBootPhase = 'state-ready';
+
+                document.documentElement.style.setProperty(
+                    '--document-line-number-enter-duration',
+                    `${documentLineNumberMotion.enterDurationMs}ms`
+                );
+                document.documentElement.style.setProperty(
+                    '--document-line-number-exit-duration',
+                    `${documentLineNumberMotion.exitDurationMs}ms`
+                );
+                document.documentElement.style.setProperty(
+                    '--document-line-number-enter-offset-x',
+                    `${documentLineNumberMotion.enterOffsetPx}px`
+                );
+                document.documentElement.style.setProperty(
+                    '--document-line-number-exit-offset-x',
+                    `${documentLineNumberMotion.exitOffsetPx}px`
+                );
 
                 function postMessageIfAvailable(handler, payload) {
                     if (handler && typeof handler.postMessage === 'function') {
@@ -190,15 +215,43 @@ enum HTMLTemplate {
                     }
                 }
 
+                function prefersReducedMotion() {
+                    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                }
+
+                function setDocumentLineNumberState(nextState) {
+                    documentLineNumberColumn.dataset.documentLineNumbersState = nextState;
+                }
+
+                function cancelDocumentLineNumberRevealFrame() {
+                    if (documentLineNumberRevealFrameID) {
+                        cancelAnimationFrame(documentLineNumberRevealFrameID);
+                        documentLineNumberRevealFrameID = 0;
+                    }
+                }
+
+                function clearDocumentLineNumberHideTimer() {
+                    if (documentLineNumberHideTimerID) {
+                        clearTimeout(documentLineNumberHideTimerID);
+                        documentLineNumberHideTimerID = 0;
+                    }
+                }
+
                 function clearDocumentLineNumbers() {
+                    clearDocumentLineNumberHideTimer();
+                    cancelDocumentLineNumberRevealFrame();
                     documentLineNumberColumn.replaceChildren();
                     documentLineNumberColumn.style.left = '';
                     documentLineNumberColumn.style.top = '';
                     document.documentElement.style.setProperty('--document-line-number-gutter-width', '0px');
+                    setDocumentLineNumberState('hidden');
                 }
 
                 function scheduleDocumentLineNumberLayout() {
-                    if (!viewerState.documentLineNumbersVisible) {
+                    if (
+                        !viewerState.documentLineNumbersVisible &&
+                        documentLineNumberColumn.dataset.documentLineNumbersState !== 'exiting'
+                    ) {
                         clearDocumentLineNumbers();
                         return;
                     }
@@ -335,6 +388,24 @@ enum HTMLTemplate {
                         fragment.appendChild(row);
                     }
                     documentLineNumberColumn.replaceChildren(fragment);
+
+                    if (!viewerState.documentLineNumbersVisible) {
+                        return;
+                    }
+
+                    cancelDocumentLineNumberRevealFrame();
+                    if (prefersReducedMotion()) {
+                        setDocumentLineNumberState('visible');
+                        return;
+                    }
+
+                    documentLineNumberRevealFrameID = requestAnimationFrame(() => {
+                        documentLineNumberRevealFrameID = 0;
+                        if (!viewerState.documentLineNumbersVisible) {
+                            return;
+                        }
+                        setDocumentLineNumberState('visible');
+                    });
                 }
 
                 function renderMarkdown(source) {
@@ -516,11 +587,33 @@ enum HTMLTemplate {
 
                 function setDocumentLineNumbersVisible(nextVisible) {
                     viewerState.documentLineNumbersVisible = !!nextVisible;
+                    clearDocumentLineNumberHideTimer();
+                    cancelDocumentLineNumberRevealFrame();
+
                     if (!viewerState.documentLineNumbersVisible) {
-                        clearDocumentLineNumbers();
+                        if (prefersReducedMotion()) {
+                            clearDocumentLineNumbers();
+                            return;
+                        }
+                        if (!documentLineNumberColumn.children.length) {
+                            clearDocumentLineNumbers();
+                            return;
+                        }
+                        setDocumentLineNumberState('exiting');
+                        documentLineNumberHideTimerID = window.setTimeout(() => {
+                            documentLineNumberHideTimerID = 0;
+                            if (!viewerState.documentLineNumbersVisible) {
+                                clearDocumentLineNumbers();
+                            }
+                        }, documentLineNumberMotion.exitDurationMs);
                         return;
                     }
+
+                    setDocumentLineNumberState('entering');
                     scheduleDocumentLineNumberLayout();
+                    if (prefersReducedMotion()) {
+                        setDocumentLineNumberState('visible');
+                    }
                 }
 
                 // Intercept external link clicks
