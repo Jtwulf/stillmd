@@ -12,7 +12,8 @@ final class StillmdDocumentWindow: NSWindow, NSWindowDelegate {
         initialFileURL: URL?,
         windowManager: WindowManager,
         pendingCoordinator: PendingFileOpenCoordinator,
-        themeState: ThemeState
+        themeState: ThemeState,
+        initialFrame: NSRect? = nil
     ) {
         let session = DocumentWindowSession(fileURL: initialFileURL)
         self.session = session
@@ -62,7 +63,11 @@ final class StillmdDocumentWindow: NSWindow, NSWindowDelegate {
         hostingView.frame = NSRect(origin: .zero, size: rect.size)
         hostingView.autoresizingMask = [.width, .height]
         contentView = hostingView
-        center()
+        if let initialFrame {
+            setFrame(initialFrame, display: false)
+        } else {
+            center()
+        }
         makeKeyAndOrderFront(nil)
     }
 
@@ -86,13 +91,15 @@ enum DocumentWindowFactory {
         initialURL: URL? = nil,
         windowManager: WindowManager,
         pendingCoordinator: PendingFileOpenCoordinator,
-        themeState: ThemeState
+        themeState: ThemeState,
+        initialFrame: NSRect? = nil
     ) {
         let window = StillmdDocumentWindow(
             initialFileURL: initialURL,
             windowManager: windowManager,
             pendingCoordinator: pendingCoordinator,
-            themeState: themeState
+            themeState: themeState,
+            initialFrame: initialFrame
         )
         guard let appDelegate = NSApplication.shared.delegate as? AppDelegate else { return }
         appDelegate.trackDocumentWindow(window)
