@@ -635,6 +635,90 @@ struct WKWebViewIntegrationTests {
         )
         #expect(headingCount == 1)
     }
+
+    @Test("Code block line numbers align with rendered code rows in WKWebView")
+    func codeBlockLineNumbersAlignWithRenderedRows() async throws {
+        let markdown = """
+        ```text
+        line 01
+        line 02
+        line 03
+        line 04
+        line 05
+        line 06
+        line 07
+        line 08
+        line 09
+        line 10
+        line 11
+        line 12
+        ```
+        """
+
+        let configuration = StillmdWebViewConfiguration.make(
+            userContentController: WKUserContentController()
+        )
+        let webView = WKWebView(
+            frame: NSRect(x: 0, y: 0, width: 900, height: 900),
+            configuration: configuration
+        )
+        let probe = WKNavigationProbe()
+        let baseURL = URL(
+            fileURLWithPath: FileManager.default.currentDirectoryPath,
+            isDirectory: true
+        )
+        let html = HTMLTemplate.build(
+            markdownContent: markdown,
+            markedJS: ResourceLoader.loadMarkedJS(),
+            highlightJS: ResourceLoader.loadHighlightJS(),
+            css: ResourceLoader.loadCSS(),
+            documentBaseURL: baseURL
+        )
+
+        try await probe.loadHTML(in: webView, html: html, baseURL: baseURL)
+
+        let metricsJSON = try await evaluateJavaScriptString(
+            """
+            (() => {
+                const numbers = Array.from(document.querySelectorAll('.stillmd-code-line-number'));
+                const rows = Array.from(document.querySelectorAll('.stillmd-code-line'));
+                return JSON.stringify({
+                    numberCount: numbers.length,
+                    rowCount: rows.length,
+                    diffs: numbers.map((numberEl, index) => {
+                        const rowEl = rows[index];
+                        const numberRect = numberEl.getBoundingClientRect();
+                        const rowRect = rowEl.getBoundingClientRect();
+                        return {
+                            heightDiff: Math.abs(numberRect.height - rowRect.height),
+                            topDiff: Math.abs(numberRect.top - rowRect.top)
+                        };
+                    })
+                });
+            })()
+            """,
+            in: webView
+        )
+
+        let metricsData = try #require(metricsJSON.data(using: .utf8))
+        let metricsObject = try #require(
+            try JSONSerialization.jsonObject(with: metricsData) as? [String: Any]
+        )
+        let numberCount = try #require(metricsObject["numberCount"] as? Int)
+        let rowCount = try #require(metricsObject["rowCount"] as? Int)
+        let diffs = try #require(metricsObject["diffs"] as? [[String: Any]])
+
+        #expect(numberCount == rowCount)
+        #expect(numberCount >= 12)
+        #expect(diffs.count == rowCount)
+
+        for diff in diffs {
+            let heightDiff = try #require(diff["heightDiff"] as? Double)
+            let topDiff = try #require(diff["topDiff"] as? Double)
+            #expect(heightDiff < 0.75, "Code line number height should match code row height")
+            #expect(topDiff < 0.75, "Code line number top should match code row top")
+        }
+    }
 }
 
 
@@ -1698,6 +1782,24 @@ struct CSSAndInfoPlistUnitTests {
         let css = try #require(try? String(contentsOf: cssURL!, encoding: .utf8))
         #expect(css.contains("line-height: 1.74;"),
                 "preview.css should keep the body line-height fixed at 1.74")
+    }
+
+    @Test("preview.css keeps code line numbers and code rows on shared typography")
+    func cssCodeBlockLineNumberMetricsStayAligned() throws {
+        let cssURL = Bundle.module.url(forResource: "preview", withExtension: "css")
+        let css = try #require(try? String(contentsOf: cssURL!, encoding: .utf8))
+        #expect(css.contains(".stillmd-code-block"),
+                "preview.css should define stillmd code block styling")
+        #expect(css.contains("font-size: 0.82em;"),
+                "preview.css should set a shared code block font size")
+        #expect(css.contains(".stillmd-code-gutter"),
+                "preview.css should define the code gutter styling")
+        #expect(css.contains("font-size: inherit;"),
+                "preview.css should keep the code gutter on the block font size")
+        #expect(css.contains(".stillmd-code-line-content"),
+                "preview.css should define code line content styling")
+        #expect(css.contains("line-height: inherit;"),
+                "preview.css should keep code line content on the shared line height")
     }
 
     // --- Info.plist Tests ---
