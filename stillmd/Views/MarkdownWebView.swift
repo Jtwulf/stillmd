@@ -3,6 +3,13 @@ import SwiftUI
 import WebKit
 
 enum StillmdWebViewLogger {
+    /// Layout / render diagnostics; omitted in release to reduce stderr churn.
+    static func logDiagnostic(_ message: String) {
+        #if DEBUG
+        fputs("[stillmd][WKWebView] \(message)\n", stderr)
+        #endif
+    }
+
     static func log(_ message: String) {
         fputs("[stillmd][WKWebView] \(message)\n", stderr)
     }
@@ -60,13 +67,15 @@ final class StillmdMarkdownWebContainerView: NSView {
         super.layout()
         webView.frame = bounds
         if bounds.width < 1 || bounds.height < 1 {
-            StillmdWebViewLogger.log("container laid out with tiny bounds: \(bounds.debugDescription)")
+            StillmdWebViewLogger.logDiagnostic("container laid out with tiny bounds: \(bounds.debugDescription)")
         }
     }
 }
 
 struct MarkdownWebView: NSViewRepresentable {
     let markdownContent: String
+    /// Precomputed in `PreviewViewModel` when markdown changes; avoids duplicate full-document regex scans.
+    let containsMermaidFence: Bool
     let baseURL: URL
     @Binding var scrollPosition: CGFloat
     let themePreference: ThemePreference
@@ -94,7 +103,6 @@ struct MarkdownWebView: NSViewRepresentable {
         webView.setValue(true, forKey: "drawsBackground")
         webView.wantsLayer = true
 
-        let containsMermaidFence = HTMLTemplate.containsMermaidFence(in: markdownContent)
         let html = HTMLTemplate.build(
             markdownContent: markdownContent,
             markedJS: ResourceLoader.loadMarkedJS(),
@@ -137,8 +145,6 @@ struct MarkdownWebView: NSViewRepresentable {
     func updateNSView(_ container: StillmdMarkdownWebContainerView, context: Context) {
         let webView = container.webView
         context.coordinator.parent = self
-        let containsMermaidFence = HTMLTemplate.containsMermaidFence(in: markdownContent)
-
         guard markdownContent != context.coordinator.lastContent else {
             applyAppearanceAndFindState(to: webView, context: context)
             return
@@ -312,7 +318,7 @@ struct MarkdownWebView: NSViewRepresentable {
 
             webView.evaluateJavaScript(script) { [weak self] value, error in
                 if let error {
-                    StillmdWebViewLogger.log("diagnostic probe failed: \(error.localizedDescription)")
+                    StillmdWebViewLogger.logDiagnostic("diagnostic probe failed: \(error.localizedDescription)")
                     return
                 }
 
@@ -325,7 +331,7 @@ struct MarkdownWebView: NSViewRepresentable {
                         .map { "\($0.key)=\($0.value)" }
                         .joined(separator: ", ")
                     let fileName = self?.parent.baseURL.lastPathComponent ?? "unknown"
-                    StillmdWebViewLogger.log("suspicious render state for \(fileName): \(summary)")
+                    StillmdWebViewLogger.logDiagnostic("suspicious render state for \(fileName): \(summary)")
                 }
             }
         }

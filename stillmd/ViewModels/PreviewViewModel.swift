@@ -5,11 +5,16 @@ import Combine
 class PreviewViewModel: ObservableObject {
     let fileURL: URL
     @Published var markdownContent: String = ""
+    /// Derived when `markdownContent` changes; avoids re-scanning the full document on every WebView update.
+    @Published private(set) var containsMermaidFence: Bool = false
     @Published var errorMessage: String? = nil
     @Published var scrollPosition: CGFloat = 0
 
     private var fileWatcher: FileWatcher?
     private var recoveryTask: Task<Void, Never>?
+    private var modifiedDebounceTask: Task<Void, Never>?
+    /// Coalesce rapid `.modified` events from editors (see `docs/plans/STILLMD_PERFORMANCE_REFACTOR_IMPLEMENTATION_PLAN.md`).
+    private let modifiedDebounce: Duration = .milliseconds(100)
     /// `NSOpenPanel` / sandbox user-selected files need a matching `stopAccessing…` in `deinit`.
     private let holdsSecurityScopedAccess: Bool
 
@@ -35,6 +40,9 @@ class PreviewViewModel: ObservableObject {
     }
 
     func stopWatching() {
+        modifiedDebounceTask?.cancel()
+        modifiedDebounceTask = nil
+        loadFile()
         recoveryTask?.cancel()
         recoveryTask = nil
         fileWatcher?.stop()
@@ -46,6 +54,7 @@ class PreviewViewModel: ObservableObject {
             let newContent = try String(contentsOf: fileURL, encoding: .utf8)
             if newContent != markdownContent {
                 markdownContent = newContent
+                containsMermaidFence = HTMLTemplate.containsMermaidFence(in: newContent)
             }
             errorMessage = nil
             recoveryTask?.cancel()
@@ -55,13 +64,24 @@ class PreviewViewModel: ObservableObject {
         }
     }
 
-    private func handleFileEvent(_ event: FileWatcher.Event) {
+    /// Exposed for tests (`@testable import`); production path is `FileWatcher` → `startWatching`.
+    func handleFileEvent(_ event: FileWatcher.Event) {
         switch event {
         case .modified:
-            loadFile()
+            scheduleDebouncedLoadFromDisk()
         case .deleted:
             errorMessage = "ファイルが見つかりません: \(fileURL.lastPathComponent)"
             startRecoveryPolling()
+        }
+    }
+
+    private func scheduleDebouncedLoadFromDisk() {
+        modifiedDebounceTask?.cancel()
+        let delay = modifiedDebounce
+        modifiedDebounceTask = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled, let self else { return }
+            self.loadFile()
         }
     }
 

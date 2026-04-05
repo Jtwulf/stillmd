@@ -118,6 +118,7 @@ struct PreviewView: View {
             if shouldKeepPreviewVisible {
                 MarkdownWebView(
                     markdownContent: viewModel.markdownContent,
+                    containsMermaidFence: viewModel.containsMermaidFence,
                     baseURL: fileURL.deletingLastPathComponent(),
                     scrollPosition: $viewModel.scrollPosition,
                     themePreference: themePreference,
