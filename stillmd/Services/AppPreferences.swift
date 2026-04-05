@@ -25,7 +25,7 @@ enum ThemePreference: String, CaseIterable, Identifiable {
         }
     }
 
-    static let defaultPreference: ThemePreference = .light
+    static let defaultPreference: ThemePreference = .dark
     static let legacySystemRawValue = "system"
 
     static func normalized(
@@ -37,8 +37,10 @@ enum ThemePreference: String, CaseIterable, Identifiable {
         }
 
         if rawValue == legacySystemRawValue {
-            let match = fallbackAppearance?.bestMatch(from: [.darkAqua, .aqua])
-            return match == .darkAqua ? .dark : .light
+            if let match = fallbackAppearance?.bestMatch(from: [.darkAqua, .aqua]) {
+                return match == .darkAqua ? .dark : .light
+            }
+            return defaultPreference
         }
 
         return defaultPreference

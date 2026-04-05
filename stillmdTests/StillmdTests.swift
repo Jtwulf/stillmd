@@ -1678,6 +1678,7 @@ struct AppPreferencesUnitTests {
     @Test("ThemePreference exposes only light and dark")
     func themePreferenceExposesOnlyConcreteSchemes() {
         #expect(ThemePreference.allCases == [.light, .dark])
+        #expect(ThemePreference.defaultPreference == .dark)
         #expect(ThemePreference.light.colorScheme == .light)
         #expect(ThemePreference.dark.colorScheme == .dark)
     }
@@ -1702,11 +1703,17 @@ struct AppPreferencesUnitTests {
                 fallbackAppearance: NSAppearance(named: .aqua)
             ) == .light
         )
+        #expect(
+            ThemePreference.normalized(
+                from: ThemePreference.legacySystemRawValue,
+                fallbackAppearance: nil
+            ) == .dark
+        )
     }
 
-    @Test("Invalid theme raw values fall back to light")
-    func invalidThemeRawValuesFallBackToLight() {
-        #expect(ThemePreference.normalized(from: "unknown") == .light)
+    @Test("Invalid theme raw values fall back to dark")
+    func invalidThemeRawValuesFallBackToDark() {
+        #expect(ThemePreference.normalized(from: "unknown") == .dark)
     }
 
     @Test("Text scale is clamped to supported range")
