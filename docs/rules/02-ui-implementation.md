@@ -17,7 +17,7 @@
 
 - Settings は macOS 標準のアプリメニューから開く
 - 現在の明示的な許可項目は `Theme (Light / Dark)` と `Text scale` とする
-- 既定値は `Theme = Light` とする
+- 既定値は `Theme = Dark` とする
 - 設定項目を増やす場合は「本文体験を壊さず、かつ常設 UI で代替できない」ことを説明できなければならない
 
 ## Find in Page の扱い
