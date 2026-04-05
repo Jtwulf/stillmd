@@ -193,11 +193,9 @@ enum DocumentWindowChromeBootstrap {
     @MainActor
     static func initialColorSchemeForNewWindow() -> ColorScheme {
         let raw = UserDefaults.standard.string(forKey: AppPreferences.themeKey)
-        let pref = ThemePreference(rawValue: raw ?? "") ?? .system
-        if let scheme = pref.colorScheme {
-            return scheme
-        }
-        let appearance = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
-        return appearance == .darkAqua ? .dark : .light
+        return ThemePreference.normalized(
+            from: raw ?? ThemePreference.defaultPreference.rawValue,
+            fallbackAppearance: NSApp.effectiveAppearance
+        ).colorScheme
     }
 }

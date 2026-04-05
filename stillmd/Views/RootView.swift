@@ -5,9 +5,8 @@ struct RootView: View {
     @ObservedObject var windowManager: WindowManager
     @ObservedObject var pendingFileOpenCoordinator: PendingFileOpenCoordinator
     @Environment(\.documentChromeController) private var documentChromeController
-    @Environment(\.colorScheme) private var colorScheme
     @AppStorage(AppPreferences.themeKey) private var themePreferenceRawValue =
-        ThemePreference.system.rawValue
+        ThemePreference.defaultPreference.rawValue
 
     /// `EmptyStateView` は `isPresented == false` のとき不透明度 0 になる。初期 false のまま非同期で true にすると
     /// 起動直後ずっと透明のまま白い `NSHostingView` だけが見える。
@@ -15,11 +14,10 @@ struct RootView: View {
     @State private var isDropTargeted = false
 
     private var themePreference: ThemePreference {
-        ThemePreference(rawValue: themePreferenceRawValue) ?? .system
-    }
-
-    private var resolvedColorScheme: ColorScheme {
-        themePreference.colorScheme ?? colorScheme
+        ThemePreference.normalized(
+            from: themePreferenceRawValue,
+            fallbackAppearance: NSApp.effectiveAppearance
+        )
     }
 
     private var windowTitle: String {
@@ -28,7 +26,7 @@ struct RootView: View {
 
     var body: some View {
         ZStack {
-            WindowSurfacePalette.background(for: resolvedColorScheme)
+            WindowSurfacePalette.background(for: themePreference.colorScheme)
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -61,9 +59,6 @@ struct RootView: View {
         .onChange(of: themePreferenceRawValue) { _, _ in
             syncDocumentChrome()
         }
-        .onChange(of: colorScheme) { _, _ in
-            syncDocumentChrome()
-        }
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
             handleDrop(providers)
         }
@@ -91,7 +86,7 @@ struct RootView: View {
     private func syncDocumentChrome() {
         documentChromeController?.syncFromSwiftUI(
             title: windowTitle,
-            colorScheme: resolvedColorScheme,
+            colorScheme: themePreference.colorScheme,
             fileURL: documentSession.fileURL?.standardizedFileURL,
             windowManager: windowManager
         )

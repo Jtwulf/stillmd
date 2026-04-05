@@ -14,7 +14,7 @@ enum HTMLTemplate {
         highlightJS: String,
         css: String,
         initialScrollPosition: Double = 0,
-        themePreference: String = ThemePreference.system.rawValue,
+        themePreference: String = ThemePreference.defaultPreference.rawValue,
         textScale: Double = AppPreferences.defaultTextScale,
         documentLineNumbersVisible: Bool = false,
         documentBaseURL: URL? = nil,
@@ -102,7 +102,6 @@ enum HTMLTemplate {
                 const contentElement = document.getElementById('content');
                 const documentLineNumberOverlay = document.getElementById('document-line-number-overlay');
                 const documentLineNumberColumn = document.getElementById('document-line-number-column');
-                const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
                 const messageHandlers = window.webkit?.messageHandlers ?? {};
                 const scrollHandler = messageHandlers.scrollPosition ?? null;
                 const findResultsHandler = messageHandlers.findResults ?? null;
@@ -259,9 +258,7 @@ enum HTMLTemplate {
                 }
 
                 function getResolvedMermaidTheme() {
-                    return viewerState.themePreference === 'system'
-                        ? (mediaQuery.matches ? 'dark' : 'default')
-                        : (viewerState.themePreference === 'dark' ? 'dark' : 'default');
+                    return viewerState.themePreference === 'dark' ? 'dark' : 'default';
                 }
 
                 function configureMermaid() {
@@ -721,9 +718,7 @@ enum HTMLTemplate {
                 }
 
                 function applyTheme() {
-                    const resolvedTheme = viewerState.themePreference === 'system'
-                        ? (mediaQuery.matches ? 'dark' : 'light')
-                        : viewerState.themePreference;
+                    const resolvedTheme = viewerState.themePreference === 'dark' ? 'dark' : 'light';
                     document.documentElement.setAttribute('data-theme', resolvedTheme);
                     document.documentElement.setAttribute(
                         'data-theme-preference',
@@ -732,7 +727,7 @@ enum HTMLTemplate {
                 }
 
                 function setThemePreference(nextThemePreference) {
-                    viewerState.themePreference = nextThemePreference || 'system';
+                    viewerState.themePreference = nextThemePreference === 'dark' ? 'dark' : 'light';
                     applyTheme();
                     void renderMermaidBlocks();
                     scheduleDocumentLineNumberLayout();
@@ -791,11 +786,6 @@ enum HTMLTemplate {
                     }
                 });
 
-                // Dark mode detection
-                function updateTheme(e) {
-                    applyTheme();
-                }
-                mediaQuery.addEventListener('change', updateTheme);
                 window.__stillmdBootPhase = 'theme-ready';
                 setThemePreference(initialThemePreference);
                 setTextScale(initialTextScale);

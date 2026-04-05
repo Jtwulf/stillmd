@@ -12,10 +12,13 @@ enum WindowDefaults {
 struct StillmdApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @AppStorage(AppPreferences.themeKey) private var themePreferenceRawValue =
-        ThemePreference.system.rawValue
+        ThemePreference.defaultPreference.rawValue
 
     private var themePreference: ThemePreference {
-        ThemePreference(rawValue: themePreferenceRawValue) ?? .system
+        ThemePreference.normalized(
+            from: themePreferenceRawValue,
+            fallbackAppearance: NSApp.effectiveAppearance
+        )
     }
 
     private var windowManager: WindowManager {
@@ -59,6 +62,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
+        _ = AppPreferences.migrateLegacyThemePreferenceIfNeeded()
 
         windowManager.openNewDocumentHandler = { [weak self] url in
             guard let self else { return }

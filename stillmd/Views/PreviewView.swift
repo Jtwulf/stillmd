@@ -6,7 +6,7 @@ struct PreviewView: View {
     @StateObject private var viewModel: PreviewViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(AppPreferences.themeKey) private var themePreferenceRawValue =
-        ThemePreference.system.rawValue
+        ThemePreference.defaultPreference.rawValue
     @AppStorage(AppPreferences.textScaleKey) private var textScale = AppPreferences.defaultTextScale
 
     @State private var isFindBarPresented = false
@@ -28,7 +28,10 @@ struct PreviewView: View {
     }
 
     private var themePreference: ThemePreference {
-        ThemePreference(rawValue: themePreferenceRawValue) ?? .system
+        ThemePreference.normalized(
+            from: themePreferenceRawValue,
+            fallbackAppearance: NSApp.effectiveAppearance
+        )
     }
 
     private var shouldKeepPreviewVisible: Bool {

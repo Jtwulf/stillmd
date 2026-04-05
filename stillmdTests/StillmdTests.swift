@@ -438,12 +438,12 @@ struct HTMLTemplateUnitTests {
         #expect(!HTMLTemplate.containsMermaidFence(in: "```swift\nlet x = 1\n```"))
     }
 
-    // --- Dark Mode Detection ---
+    // --- Theme Selection ---
 
-    @Test("Contains prefers-color-scheme media query")
-    func containsDarkModeDetection() {
+    @Test("Does not contain prefers-color-scheme media query")
+    func doesNotContainDarkModeDetection() {
         let html = buildHTML(from: "test")
-        #expect(html.contains("prefers-color-scheme"))
+        #expect(!html.contains("prefers-color-scheme"))
     }
 
     // --- Message Handlers ---
@@ -1539,15 +1539,36 @@ struct PreviewViewModelUnitTests {
 @Suite("AppPreferences Unit Tests")
 struct AppPreferencesUnitTests {
 
-    @Test("ThemePreference system uses nil color scheme")
-    func themePreferenceSystemUsesNilColorScheme() {
-        #expect(ThemePreference.system.colorScheme == nil)
+    @Test("ThemePreference exposes only light and dark")
+    func themePreferenceCasesAreLightAndDark() {
+        #expect(ThemePreference.allCases == [.light, .dark])
     }
 
     @Test("ThemePreference light and dark map to matching schemes")
     func themePreferencesMapToColorSchemes() {
         #expect(ThemePreference.light.colorScheme == .light)
         #expect(ThemePreference.dark.colorScheme == .dark)
+    }
+
+    @Test("Legacy system theme raw value normalizes to a concrete scheme")
+    func legacySystemThemeNormalizesToConcreteScheme() {
+        #expect(
+            ThemePreference.normalized(
+                from: ThemePreference.legacySystemRawValue,
+                fallbackAppearance: NSAppearance(named: .darkAqua)
+            ) == .dark
+        )
+        #expect(
+            ThemePreference.normalized(
+                from: ThemePreference.legacySystemRawValue,
+                fallbackAppearance: NSAppearance(named: .aqua)
+            ) == .light
+        )
+    }
+
+    @Test("Invalid theme raw values fall back to light")
+    func invalidThemeRawValuesFallBackToLight() {
+        #expect(ThemePreference.normalized(from: "unknown") == .light)
     }
 
     @Test("Text scale is clamped to supported range")

@@ -245,7 +245,7 @@ struct MarkdownWebView: NSViewRepresentable {
         var parent: MarkdownWebView
         private var didReportInitialNavigationCommit = false
         var lastContent: String = ""
-        var lastThemePreference: String = ThemePreference.system.rawValue
+        var lastThemePreference: String = ThemePreference.defaultPreference.rawValue
         var lastTextScale: Double = AppPreferences.defaultTextScale
         var lastDocumentLineNumbersVisible: Bool = false
         var lastFindQuery: String = ""
