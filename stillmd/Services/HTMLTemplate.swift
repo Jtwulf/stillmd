@@ -61,6 +61,8 @@ enum HTMLTemplate {
         <body>
             <div id="content"></div>
             <script>
+                // MARK: Embedded preview runtime (marked.js, highlight.js, Mermaid, stillmd bridge)
+                // Kept inline for a single `loadHTMLString` document; Swift splits would fragment bundle/tests.
                 try {
                 window.__stillmdBootPhase = 'script-start';
                 // Strip raw HTML blocks from markdown output for security.

@@ -1557,6 +1557,121 @@ struct PreviewViewModelUnitTests {
         #expect(vm.errorMessage == nil,
                 "errorMessage should be nil after successful reload")
     }
+
+    @Test("containsMermaidFence is false for plain Markdown")
+    @MainActor
+    func mermaidFlagFalseWithoutFence() throws {
+        let content = "# Title\n\nNo diagram here."
+        let fileURL = try createTempFile(content: content)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let vm = PreviewViewModel(fileURL: fileURL)
+        #expect(vm.containsMermaidFence == false)
+    }
+
+    @Test("containsMermaidFence is true when file has a Mermaid fence")
+    @MainActor
+    func mermaidFlagTrueWithFence() throws {
+        let content = """
+        # Diagram
+
+        ```mermaid
+        graph LR
+          A-->B
+        ```
+        """
+        let fileURL = try createTempFile(content: content)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let vm = PreviewViewModel(fileURL: fileURL)
+        #expect(vm.containsMermaidFence == true)
+    }
+
+    @Test(".modified is debounced; .deleted is immediate")
+    @MainActor
+    func fileEventDebouncing() async throws {
+        let fileURL = try createTempFile(content: "v0")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let vm = PreviewViewModel(fileURL: fileURL)
+        #expect(vm.markdownContent == "v0")
+
+        try "v1".write(to: fileURL, atomically: true, encoding: .utf8)
+        vm.handleFileEvent(.modified)
+        try await Task.sleep(for: .milliseconds(30))
+        #expect(vm.markdownContent == "v0")
+
+        try await Task.sleep(for: .milliseconds(120))
+        #expect(vm.markdownContent == "v1")
+
+        vm.handleFileEvent(.deleted)
+        #expect(vm.errorMessage != nil)
+    }
+
+    @Test("Rapid .modified coalesces to the latest file contents")
+    @MainActor
+    func rapidModifiedCoalesces() async throws {
+        let fileURL = try createTempFile(content: "a")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let vm = PreviewViewModel(fileURL: fileURL)
+
+        try "b".write(to: fileURL, atomically: true, encoding: .utf8)
+        vm.handleFileEvent(.modified)
+        try await Task.sleep(for: .milliseconds(40))
+        try "c".write(to: fileURL, atomically: true, encoding: .utf8)
+        vm.handleFileEvent(.modified)
+
+        // 100ms debounce from the last `.modified` plus scheduling slack
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(vm.markdownContent == "c")
+    }
+
+    @Test(".deleted cancels a pending .modified debounce so loadFile does not overwrite the delete error")
+    @MainActor
+    func deletedCancelsPendingModifiedDebounce() async throws {
+        let fileURL = try createTempFile(content: "x")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let vm = PreviewViewModel(fileURL: fileURL)
+        vm.handleFileEvent(.modified)
+        try FileManager.default.removeItem(at: fileURL)
+        vm.handleFileEvent(.deleted)
+
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(vm.errorMessage?.contains("見つかりません") == true)
+        #expect(vm.errorMessage?.contains("読み込めません") != true)
+    }
+
+    @Test("stopWatching cancels pending debounce; startWatching resyncs from disk")
+    @MainActor
+    func stopWatchingCancelsDebounceAndStartWatchingResyncs() async throws {
+        let fileURL = try createTempFile(content: "old")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let vm = PreviewViewModel(fileURL: fileURL)
+        try "new".write(to: fileURL, atomically: true, encoding: .utf8)
+        vm.handleFileEvent(.modified)
+        try await Task.sleep(for: .milliseconds(20))
+        vm.stopWatching()
+        #expect(vm.markdownContent == "old")
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(vm.markdownContent == "old")
+
+        vm.startWatching()
+        #expect(vm.markdownContent == "new")
+    }
+}
+
+@Suite("ResourceLoader caching")
+struct ResourceLoaderCachingTests {
+    @Test("Static assets return identical content across repeated loads")
+    func repeatedLoadsAreEqual() {
+        #expect(ResourceLoader.loadMarkedJS() == ResourceLoader.loadMarkedJS())
+        #expect(ResourceLoader.loadHighlightJS() == ResourceLoader.loadHighlightJS())
+        #expect(ResourceLoader.loadCSS() == ResourceLoader.loadCSS())
+        #expect(ResourceLoader.loadMermaidJS() == ResourceLoader.loadMermaidJS())
+    }
 }
 
 @Suite("AppPreferences Unit Tests")
