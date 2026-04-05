@@ -21,6 +21,24 @@ private enum StillmdHTMLTestHelpers {
     }
 }
 
+private enum StillmdTestPaths {
+    static let packageRoot = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+
+    static let exampleImageDirectory = packageRoot.appendingPathComponent(
+        "assets/example-image",
+        isDirectory: true
+    )
+}
+
+private struct StillmdRenderedImageInfo: Codable {
+    let src: String
+    let complete: Bool
+    let naturalWidth: Int
+    let naturalHeight: Int
+}
+
 @MainActor
 private final class WKNavigationProbe: NSObject, WKNavigationDelegate {
     struct TimeoutError: Error {}
@@ -47,6 +65,28 @@ private final class WKNavigationProbe: NSObject, WKNavigationDelegate {
             }
             webView.navigationDelegate = self
             webView.loadHTMLString(html, baseURL: baseURL)
+        }
+    }
+
+    func loadFile(
+        in webView: WKWebView,
+        fileURL: URL,
+        allowingReadAccessTo readAccessURL: URL
+    ) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            self.continuation = continuation
+            timeoutTask?.cancel()
+            timeoutTask = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(10))
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    guard let self, let continuation = self.continuation else { return }
+                    self.continuation = nil
+                    continuation.resume(throwing: TimeoutError())
+                }
+            }
+            webView.navigationDelegate = self
+            webView.loadFileURL(fileURL, allowingReadAccessTo: readAccessURL)
         }
     }
 
@@ -121,6 +161,24 @@ private func waitForJavaScriptInt(
     }
 
     return lastValue
+}
+
+@MainActor
+private func writeTemporaryHTMLFile(
+    _ html: String,
+    rootDirectory: URL
+) throws -> (htmlFileURL: URL, directoryURL: URL) {
+    let directoryURL = rootDirectory
+        .appendingPathComponent(".stillmd-tests-html", isDirectory: true)
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(
+        at: directoryURL,
+        withIntermediateDirectories: true
+    )
+
+    let htmlFileURL = directoryURL.appendingPathComponent("preview.html")
+    try html.write(to: htmlFileURL, atomically: true, encoding: .utf8)
+    return (htmlFileURL, directoryURL)
 }
 
 // MARK: - Task 2.2: Property Test — File Extension Validation (Property 1)
@@ -342,6 +400,20 @@ struct GFMConversionPropertyTests {
             highlightJS: "// mock highlight.js",
             css: "/* mock css */"
         )
+    }
+
+    private func writeTemporaryHTMLFile(_ html: String) throws -> (htmlFileURL: URL, directoryURL: URL) {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("stillmd-tests-html", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: directoryURL,
+            withIntermediateDirectories: true
+        )
+
+        let htmlFileURL = directoryURL.appendingPathComponent("preview.html")
+        try html.write(to: htmlFileURL, atomically: true, encoding: .utf8)
+        return (htmlFileURL, directoryURL)
     }
 
     /// For any valid Markdown string, HTMLTemplate.build() produces non-empty HTML
@@ -791,6 +863,126 @@ struct WKWebViewIntegrationTests {
 
         #expect(renderedCount == 1)
         #expect(fallbackCount == 0)
+    }
+
+    @Test("Local markdown images render when loaded through WKWebView file access")
+    func localMarkdownImagesRenderThroughFileAccess() async throws {
+        let markdown = """
+        # Image test
+
+        ![dark preview](./stillmd-image-dark.png)
+
+        ![light preview](./stillmd-image-light.png)
+        """
+
+        let configuration = StillmdWebViewConfiguration.make(
+            userContentController: WKUserContentController()
+        )
+        let webView = WKWebView(
+            frame: NSRect(x: 0, y: 0, width: 900, height: 900),
+            configuration: configuration
+        )
+        let probe = WKNavigationProbe()
+        let baseURL = StillmdTestPaths.exampleImageDirectory
+        let html = HTMLTemplate.build(
+            markdownContent: markdown,
+            markedJS: ResourceLoader.loadMarkedJS(),
+            highlightJS: ResourceLoader.loadHighlightJS(),
+            css: ResourceLoader.loadCSS(),
+            documentBaseURL: baseURL
+        )
+        let tempHTML = try writeTemporaryHTMLFile(html, rootDirectory: baseURL)
+        defer {
+            try? FileManager.default.removeItem(at: tempHTML.directoryURL)
+        }
+
+        try await probe.loadFile(
+            in: webView,
+            fileURL: tempHTML.htmlFileURL,
+            allowingReadAccessTo: baseURL
+        )
+
+        let loadedCount = try await waitForJavaScriptInt(
+            """
+            (() => {
+                const images = Array.from(document.querySelectorAll('img'));
+                const loaded = images.filter((img) => img.complete && img.naturalWidth > 0).length;
+                return loaded === 2 ? 2 : 0;
+            })()
+            """,
+            in: webView
+        )
+        #expect(loadedCount == 2)
+
+        let imagesJSON = try await evaluateJavaScriptString(
+            """
+            JSON.stringify(Array.from(document.querySelectorAll('img')).map((img) => ({
+                src: img.src,
+                complete: img.complete,
+                naturalWidth: img.naturalWidth,
+                naturalHeight: img.naturalHeight
+            })))
+            """,
+            in: webView
+        )
+        let images = try JSONDecoder().decode(
+            [StillmdRenderedImageInfo].self,
+            from: Data(imagesJSON.utf8)
+        )
+
+        #expect(images.count == 2)
+        #expect(images.allSatisfy { $0.complete })
+        #expect(images.allSatisfy { $0.naturalWidth > 0 })
+        #expect(images.allSatisfy { $0.naturalHeight > 0 })
+        #expect(images.contains { $0.src.hasSuffix("/stillmd-image-dark.png") })
+        #expect(images.contains { $0.src.hasSuffix("/stillmd-image-light.png") })
+    }
+
+    @Test("Missing local images stay broken rather than silently succeeding")
+    func missingLocalImageStaysBroken() async throws {
+        let markdown = """
+        # Missing image test
+
+        ![missing preview](./does-not-exist.png)
+        """
+
+        let configuration = StillmdWebViewConfiguration.make(
+            userContentController: WKUserContentController()
+        )
+        let webView = WKWebView(
+            frame: NSRect(x: 0, y: 0, width: 900, height: 900),
+            configuration: configuration
+        )
+        let probe = WKNavigationProbe()
+        let baseURL = StillmdTestPaths.exampleImageDirectory
+        let html = HTMLTemplate.build(
+            markdownContent: markdown,
+            markedJS: ResourceLoader.loadMarkedJS(),
+            highlightJS: ResourceLoader.loadHighlightJS(),
+            css: ResourceLoader.loadCSS(),
+            documentBaseURL: baseURL
+        )
+        let tempHTML = try writeTemporaryHTMLFile(html, rootDirectory: baseURL)
+        defer {
+            try? FileManager.default.removeItem(at: tempHTML.directoryURL)
+        }
+
+        try await probe.loadFile(
+            in: webView,
+            fileURL: tempHTML.htmlFileURL,
+            allowingReadAccessTo: baseURL
+        )
+
+        let brokenCount = try await waitForJavaScriptInt(
+            """
+            (() => {
+                const image = document.querySelector('img');
+                return image && image.complete && image.naturalWidth === 0 ? 1 : 0;
+            })()
+            """,
+            in: webView
+        )
+        #expect(brokenCount == 1)
     }
 
     @Test("Invalid Mermaid source keeps fallback code visible")
